@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Celefy – Celebrate Better</title>
+    <meta name="description" content="Celefy is your smart celebration and birthday reminder app with filters, countdowns, and push notifications. Never miss a special day again." />
+    <meta name="theme-color" content="#209CEE" />
+
+    <link rel="icon" type="image/png" href="/icons/icon-192.png" />
+    <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+
+    <link rel="manifest" href="/manifest.webmanifest" />
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+    <!-- OneSignal SDK -->
+    <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" async></script>
+
+    <script>
+      window.OneSignal = window.OneSignal || [];
+      window.OneSignal.push(function() {
+        window.OneSignal.init({
+          appId: "b714db0f-1b9e-4b4b-87fb-1d52c3309714",
+          safari_web_id: "web.onesignal.auto.145f18a4-510a-4781-b676-50fa3f7fa700",
+          notifyButton: {
+            enable: true,
+          },
+          allowLocalhostAsSecureOrigin: true
+        });
+      });
+    </script>
+  </head>
+
+  <body class="bg-light dark:bg-dark">
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
