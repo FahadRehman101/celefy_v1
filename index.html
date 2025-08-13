@@ -18,21 +18,35 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
 
-    <!-- OneSignal SDK -->
-    <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" async></script>
-
+    <!-- OneSignal SDK - Using correct v16 version -->
+    <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+    
+    <!-- Test script to see if OneSignal loads -->
     <script>
-      window.OneSignal = window.OneSignal || [];
-      window.OneSignal.push(function() {
-        window.OneSignal.init({
-          appId: "b714db0f-1b9e-4b4b-87fb-1d52c3309714",
-          safari_web_id: "web.onesignal.auto.145f18a4-510a-4781-b676-50fa3f7fa700",
-          notifyButton: {
-            enable: true,
-          },
-          allowLocalhostAsSecureOrigin: true
-        });
-      });
+      console.log('🚀 HTML loaded, checking OneSignal loading...');
+      
+      // Check if OneSignal loads
+      let checkCount = 0;
+      const checkOneSignalLoading = () => {
+        checkCount++;
+        const elapsed = Math.round((Date.now - performance.timing.navigationStart) / 1000);
+        
+        console.log(`🚀 OneSignal loading check #${checkCount} (${elapsed}s):`);
+        console.log(`🚀 - OneSignal exists: ${typeof window.OneSignal !== 'undefined'}`);
+        
+        if (typeof window.OneSignal !== 'undefined') {
+          console.log('✅ OneSignal SDK loaded successfully!');
+          console.log('🚀 OneSignal object:', window.OneSignal);
+          console.log('🚀 OneSignal keys:', Object.keys(window.OneSignal));
+        } else if (checkCount < 60) { // Check for 60 seconds
+          setTimeout(checkOneSignalLoading, 1000);
+        } else {
+          console.error('❌ OneSignal SDK failed to load after 60 seconds!');
+        }
+      };
+      
+      // Start checking after a short delay
+      setTimeout(checkOneSignalLoading, 1000);
     </script>
   </head>
 

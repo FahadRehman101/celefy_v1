@@ -8,6 +8,7 @@ import Stories from '@/pages/Stories';
 
 import OnboardingModal from '@/components/onboarding/OnboardingModal';
 import Navigation from '@/components/layout/Navigation';
+import OneSignalTester from '@/components/OneSignalTester';
 
 import {
   mockBirthdays,
@@ -15,37 +16,7 @@ import {
   mockStories
 } from '@/utils/placeholders';
 
-// You can also move this to its own file: OneSignalTester.jsx
-const OneSignalTester = () => {
-  useEffect(() => {
-    if (window.OneSignalGlobal) {
-      window.OneSignalGlobal.isPushNotificationsEnabled().then(enabled => {
-        console.log('Push enabled?', enabled);
-      });
-    } else {
-      console.log('OneSignal not loaded yet');
-    }
-  }, []);
-
-  const askPermission = () => {
-    if (window.OneSignalGlobal) {
-      window.OneSignalGlobal.showNativePrompt();
-    } else {
-      alert('OneSignal is not ready yet, please wait a moment and try again.');
-    }
-  };
-
-  return (
-    <div style={{ margin: 20 }}>
-      <button
-        onClick={askPermission}
-        style={{ padding: '10px 20px', fontSize: '16px' }}
-      >
-        Subscribe to Notifications
-      </button>
-    </div>
-  );
-};
+// OneSignalTester component moved to separate file
 
 const App = () => {
   // User auth placeholder
