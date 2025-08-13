@@ -1,28 +1,189 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import BirthdayList from '@/components/birthday/BirthdayList';
 import {
   Gift,
   Calendar,
   TrendingUp,
   Search,
+  Loader2,
+  AlertCircle,
+  RefreshCw,
+  Wifi,
+  WifiOff,
+  Cloud,
+  CloudOff
 } from 'lucide-react';
 import Card from '@/components/ui/Card';
 import AddBirthdayModal from '@/components/birthday/AddBirthdayModal';
 import { calculateDaysUntilBirthday } from '@/utils/dates';
-import { mockBirthdays } from '@/utils/placeholders';
+import { getBirthdaysOptimized, syncPendingChanges } from '@/services/firestore-cached'; // Updated import
+import localStorage from '@/services/localStorage'; // Add localStorage import
 
 const Dashboard = ({ user }) => {
-  const [birthdays, setBirthdays] = useState(mockBirthdays);
+  // State management
+  const [birthdays, setBirthdays] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [selectedFilter, setSelectedFilter] = useState('All');
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  
+  // New state for caching and offline support
+  const [dataSource, setDataSource] = useState('cache'); // 'cache', 'server', 'offline'
+  const [isOnline, setIsOnline] = useState(localStorage.isOnline());
+  const [syncStatus, setSyncStatus] = useState('idle'); // 'idle', 'syncing', 'synced', 'error'
+  const [pendingChanges, setPendingChanges] = useState(0);
 
- const handleAddBirthday = (newBirthday) => {
-  setBirthdays((prev) => [...prev, newBirthday]);
+  // Load birthdays on component mount
+  useEffect(() => {
+    if (user?.uid) {
+      loadBirthdaysOptimized();
+      checkPendingChanges();
+    }
+  }, [user?.uid]);
+
+  // Set up network listeners
+  useEffect(() => {
+    const cleanup = localStorage.setupNetworkListeners(
+      () => {
+        console.log('🌐 Back online!');
+        setIsOnline(true);
+        // Auto-sync when back online
+        if (user?.uid) {
+          handleSyncPendingChanges();
+        }
+      },
+      () => {
+        console.log('📴 Gone offline');
+        setIsOnline(false);
+        setSyncStatus('offline');
+      }
+    );
+
+    return cleanup;
+  }, [user?.uid]);
+
+  /**
+   * Load birthdays using optimized cached service
+   */
+  const loadBirthdaysOptimized = async (forceSync = false) => {
+    try {
+      if (forceSync) {
+        setRefreshing(true);
+        setSyncStatus('syncing');
+      } else {
+        setLoading(true);
+      }
+      
+      setError(null);
+      
+      console.log('📊 Loading birthdays (optimized) for user:', user.uid);
+      
+      const result = await getBirthdaysOptimized(user.uid, forceSync);
+      
+      setBirthdays(result.data);
+      setDataSource(result.fromCache ? 'cache' : 'server');
+      
+      // Update sync status
+      if (result.synced) {
+        setSyncStatus('synced');
+        setTimeout(() => setSyncStatus('idle'), 2000); // Reset after 2 seconds
+      } else if (result.syncError) {
+        setSyncStatus('error');
+      } else if (result.syncing) {
+        setSyncStatus('syncing');
+      } else {
+        setSyncStatus('idle');
+      }
+      
+      console.log('✅ Birthdays loaded (optimized):', {
+        count: result.data.length,
+        source: result.fromCache ? 'cache' : 'server',
+        syncing: result.syncing
+      });
+      
+    } catch (err) {
+      console.error('❌ Failed to load birthdays:', err);
+      setError(err.message);
+      setSyncStatus('error');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  /**
+   * Check for pending changes in sync queue
+   */
+  const checkPendingChanges = () => {
+    if (user?.uid) {
+      const queue = localStorage.getSyncQueue(user.uid);
+      setPendingChanges(queue.length);
+    }
+  };
+
+  /**
+   * Sync pending changes manually
+   */
+  const handleSyncPendingChanges = async () => {
+    if (!user?.uid || !isOnline) return;
+
+    setSyncStatus('syncing');
+    
+    try {
+      const result = await syncPendingChanges(user.uid);
+      
+      if (result.success) {
+        console.log(`✅ Synced ${result.synced} pending changes`);
+        setSyncStatus('synced');
+        
+        // Refresh data from server to get latest
+        await loadBirthdaysOptimized(true);
+        checkPendingChanges();
+        
+        setTimeout(() => setSyncStatus('idle'), 2000);
+      } else {
+        setSyncStatus('error');
+      }
+    } catch (error) {
+      console.error('❌ Failed to sync pending changes:', error);
+      setSyncStatus('error');
+    }
+  };
+
+  /**
+   * Handle adding a new birthday
+   */
+  /**
+ * Handle adding a new birthday - FIXED VERSION
+ */
+const handleAddBirthday = (newBirthday) => {
+  console.log('🎂 Dashboard: New birthday added:', newBirthday);
+  
+  // DON'T optimistically update here - the cached service handles it
+  // Just close the modal and refresh from cache
+  setShowModal(false);
+  
+  // Check for pending changes
+  checkPendingChanges();
+  
+  // Refresh data from cache (this will show the new birthday immediately)
+  loadBirthdaysOptimized(false); // false = don't force server sync
 };
 
+  /**
+   * Handle refreshing data
+   */
+  const handleRefresh = () => {
+    loadBirthdaysOptimized(true);
+  };
+
+  /**
+   * Filter birthdays based on selected filter and search term
+   */
   const filteredBirthdays = birthdays.filter((b) => {
-    const nameMatch = b.name.toLowerCase().includes(searchTerm.toLowerCase());
+    const nameMatch = b.name?.toLowerCase().includes(searchTerm.toLowerCase());
     const today = new Date();
     const bday = new Date(b.date);
     const daysUntil = calculateDaysUntilBirthday(b.date);
@@ -43,6 +204,7 @@ const Dashboard = ({ user }) => {
     }
   });
 
+  // Calculate statistics - add safety checks
   const countToday = birthdays.filter((b) => {
     const today = new Date();
     const bday = new Date(b.date);
@@ -61,81 +223,224 @@ const Dashboard = ({ user }) => {
     (b) => calculateDaysUntilBirthday(b.date) <= 7
   ).length;
 
+  // Sync status indicator
+  const getSyncStatusInfo = () => {
+    switch (syncStatus) {
+      case 'syncing':
+        return { icon: RefreshCw, color: 'text-blue-500', text: 'Syncing...', spin: true };
+      case 'synced':
+        return { icon: Cloud, color: 'text-green-500', text: 'Synced', spin: false };
+      case 'error':
+        return { icon: CloudOff, color: 'text-red-500', text: 'Sync failed', spin: false };
+      case 'offline':
+        return { icon: WifiOff, color: 'text-gray-500', text: 'Offline', spin: false };
+      default:
+        return { icon: Cloud, color: 'text-gray-400', text: 'Ready', spin: false };
+    }
+  };
+
+  const syncInfo = getSyncStatusInfo();
+  const SyncIcon = syncInfo.icon;
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="space-y-8">
+        <Card variant="gradient" padding="lg">
+          <div className="flex items-center justify-center text-white py-8">
+            <Loader2 className="w-8 h-8 animate-spin mr-3" />
+            <span className="text-xl">Loading your birthdays...</span>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="space-y-8">
+        <Card variant="gradient" padding="lg">
+          <div className="text-center text-white">
+            <AlertCircle className="w-16 h-16 mx-auto mb-4 text-red-300" />
+            <h1 className="text-2xl font-bold mb-2">Oops! Something went wrong</h1>
+            <p className="text-blue-100 mb-4">{error}</p>
+            <button
+              onClick={() => loadBirthdaysOptimized()}
+              className="bg-white/20 hover:bg-white/30 px-6 py-2 rounded-lg transition-colors flex items-center mx-auto"
+            >
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Try Again
+            </button>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8">
+      {/* Welcome Header with Status Indicators */}
       <Card variant="gradient" padding="lg">
         <div className="flex items-start justify-between text-white">
           <div>
             <h1 className="text-3xl font-bold mb-2">
-              Welcome back, {user?.displayName?.split(' ')[0] || 'Friend'}!
+              Welcome back, {user?.displayName?.split(' ')[0] || 'Friend'}! 🎉
             </h1>
-            <p>{countUpcoming} celebrations coming in the next 7 days 🎉</p>
+            <p className="text-blue-100 text-lg mb-4">
+              {birthdays.length === 0 
+                ? "Ready to add your first birthday?" 
+                : `You're tracking ${birthdays.length} birthdays`}
+            </p>
+            
+            {/* Status indicators */}
+            <div className="flex items-center space-x-4 mb-4">
+              {/* Network Status */}
+              <div className="flex items-center space-x-2">
+                {isOnline ? (
+                  <Wifi className="w-4 h-4 text-green-300" />
+                ) : (
+                  <WifiOff className="w-4 h-4 text-red-300" />
+                )}
+                <span className="text-sm text-blue-100">
+                  {isOnline ? 'Online' : 'Offline'}
+                </span>
+              </div>
+
+              {/* Sync Status */}
+              <div className="flex items-center space-x-2">
+                <SyncIcon className={`w-4 h-4 ${syncInfo.color} ${syncInfo.spin ? 'animate-spin' : ''}`} />
+                <span className="text-sm text-blue-100">{syncInfo.text}</span>
+              </div>
+
+              {/* Data Source */}
+              <div className="text-sm text-blue-200">
+                Data: {dataSource === 'cache' ? '⚡ Cached' : '☁️ Live'}
+              </div>
+
+              {/* Pending Changes */}
+              {pendingChanges > 0 && (
+                <div className="text-sm text-yellow-200">
+                  {pendingChanges} pending change{pendingChanges !== 1 ? 's' : ''}
+                </div>
+              )}
+            </div>
+            
+            {/* Action Buttons */}
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={handleRefresh}
+                disabled={refreshing}
+                className="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition-colors flex items-center disabled:opacity-50"
+              >
+                <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+                {refreshing ? 'Syncing...' : 'Refresh'}
+              </button>
+
+              {/* Sync Pending Changes Button */}
+              {pendingChanges > 0 && isOnline && (
+                <button
+                  onClick={handleSyncPendingChanges}
+                  disabled={syncStatus === 'syncing'}
+                  className="bg-yellow-500/20 hover:bg-yellow-500/30 px-4 py-2 rounded-lg transition-colors flex items-center disabled:opacity-50"
+                >
+                  <Cloud className={`w-4 h-4 mr-2 ${syncStatus === 'syncing' ? 'animate-spin' : ''}`} />
+                  Sync Changes
+                </button>
+              )}
+            </div>
           </div>
-          <div className="text-6xl opacity-20 hidden md:block">🎂</div>
+          
+          <div className="text-right">
+            <Gift className="w-16 h-16 mb-2 opacity-80" />
+            <div className="text-sm text-blue-100">
+              Last updated: {new Date().toLocaleTimeString()}
+            </div>
+          </div>
         </div>
       </Card>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-        {[
-          { icon: <Gift />, count: birthdays.length, label: 'All Friends' },
-          { icon: <Calendar />, count: countToday, label: 'Today' },
-          { icon: <Calendar />, count: countMonth, label: 'This Month' },
-          { icon: <TrendingUp />, count: countUpcoming, label: 'Upcoming' },
-        ].map((item, idx) => (
-          <Card key={idx} variant="elevated" padding="lg" className="text-center">
-            <div className="w-12 h-12 mx-auto mb-2 bg-pink-100 rounded-full flex items-center justify-center">
-              {item.icon}
-            </div>
-            <div className="text-xl font-bold">{item.count}</div>
-            <div className="text-sm text-gray-500">{item.label}</div>
-          </Card>
-        ))}
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <Card className="text-center p-6 hover:shadow-lg transition-shadow">
+          <Calendar className="w-12 h-12 mx-auto mb-3 text-blue-500" />
+          <div className="text-2xl font-bold text-gray-800">{countToday}</div>
+          <div className="text-gray-600">Today</div>
+        </Card>
+        
+        <Card className="text-center p-6 hover:shadow-lg transition-shadow">
+          <TrendingUp className="w-12 h-12 mx-auto mb-3 text-green-500" />
+          <div className="text-2xl font-bold text-gray-800">{countMonth}</div>
+          <div className="text-gray-600">This Month</div>
+        </Card>
+        
+        <Card className="text-center p-6 hover:shadow-lg transition-shadow">
+          <Gift className="w-12 h-12 mx-auto mb-3 text-purple-500" />
+          <div className="text-2xl font-bold text-gray-800">{countUpcoming}</div>
+          <div className="text-gray-600">Coming Soon</div>
+        </Card>
       </div>
 
-      <Card variant="default" padding="lg">
+      {/* Search and Filter Section */}
+      <Card className="p-6">
         <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
-          <div className="relative w-full md:w-1/2">
-            <Search className="absolute top-1/2 left-4 -translate-y-1/2 text-pink-400" />
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
             <input
               type="text"
               placeholder="Search birthdays..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-12 pr-4 py-2 rounded-xl border border-pink-200 focus:outline-none focus:ring-2 focus:ring-pink-400"
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
             />
           </div>
-          <div className="flex gap-3">
+          
+          <div className="flex gap-2">
             {['All', 'Today', 'This Month', 'Upcoming'].map((filter) => (
               <button
                 key={filter}
                 onClick={() => setSelectedFilter(filter)}
-                className={`px-4 py-2 rounded-full text-sm ${
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                   selectedFilter === filter
-                    ? 'bg-pink-500 text-white'
-                    : 'bg-white border border-pink-200 text-pink-600'
+                    ? 'bg-purple-500 text-white'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                 }`}
               >
                 {filter}
               </button>
             ))}
           </div>
+          
           <button
             onClick={() => setShowModal(true)}
-            className="px-4 py-2 bg-gradient-to-r from-pink-500 to-purple-500 text-white rounded-full shadow hover:opacity-90"
+            className="bg-gradient-to-r from-pink-500 to-purple-500 text-white px-6 py-2 rounded-lg hover:shadow-lg transition-all flex items-center"
           >
-            + Add Birthday
+            <Gift className="w-4 h-4 mr-2" />
+            Add Birthday
           </button>
         </div>
       </Card>
 
-      <BirthdayList filteredBirthdays={filteredBirthdays} />
+      {/* Birthday List */}
+      <BirthdayList 
+        birthdays={filteredBirthdays}
+        onRefresh={handleRefresh}
+        loading={refreshing}
+        userId={user?.uid}
+        onDataChange={() => {
+          checkPendingChanges();
+          // Small delay to let cache update
+          setTimeout(() => loadBirthdaysOptimized(), 100);
+        }}
+      />
 
-     <AddBirthdayModal
-  isOpen={showModal}
-  onClose={() => setShowModal(false)}
-  onAdd={handleAddBirthday}
-/>
-
+      {/* Add Birthday Modal */}
+      <AddBirthdayModal
+        isOpen={showModal}
+        onClose={() => setShowModal(false)}
+        onAdd={handleAddBirthday}
+        userId={user?.uid}
+      />
     </div>
   );
 };

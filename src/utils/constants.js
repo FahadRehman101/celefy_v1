@@ -4,7 +4,7 @@
  */
 
 // App metadata
-export const APP_NAME = 'HappieDay';
+export const APP_NAME = 'Celefy';
 export const APP_DESCRIPTION = 'Never miss a birthday again';
 export const APP_VERSION = '2.0.0';
 
@@ -64,9 +64,11 @@ export const ANIMATION_DURATION = {
 
 // Storage keys for localStorage
 export const STORAGE_KEYS = {
-  THEME: 'happieday-theme',
-  VIEW_PREFERENCE: 'happieday-view',
-  LAST_VISITED: 'happieday-last-visit'
+  THEME: 'celefy-theme',
+  VIEW_PREFERENCE: 'celefy-view',
+  LAST_VISITED: 'celefy-last-visit',
+  NOTIFICATION_PROMPT_DELAY: 'celefy-notification-prompt-delay',
+  NOTIFICATION_PROMPT_DISMISSED: 'celefy-notification-prompt-dismissed'
 };
 
 // Filter options

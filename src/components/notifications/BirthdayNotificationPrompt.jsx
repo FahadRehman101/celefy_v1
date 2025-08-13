@@ -3,6 +3,7 @@ import Modal from '@/components/ui/Modal';
 import Button from '@/components/ui/Button';
 import { Bell, Gift, Sparkles, Calendar } from 'lucide-react';
 import { requestPermission } from '@/utils/onesignal';
+import { STORAGE_KEYS } from '@/utils/constants';
 
 const BirthdayNotificationPrompt = ({ isOpen, onClose, friendName }) => {
   const [isEnabling, setIsEnabling] = useState(false);
@@ -29,7 +30,7 @@ const BirthdayNotificationPrompt = ({ isOpen, onClose, friendName }) => {
 
   const handleMaybeLater = () => {
     // Store that user said "maybe later" - ask again in a week
-    localStorage.setItem('notificationPromptDelay', Date.now() + (7 * 24 * 60 * 60 * 1000));
+    localStorage.setItem(STORAGE_KEYS.NOTIFICATION_PROMPT_DELAY, Date.now() + (7 * 24 * 60 * 60 * 1000));
     onClose('later');
   };
 

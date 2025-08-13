@@ -42,24 +42,46 @@ const App = () => {
   } = useSmartNotifications();
 
   // ✅ NEW: Firebase authentication listener
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, 
-      (user) => {
-        console.log('Auth state changed:', user ? user.email : 'No user');
-        setUser(user);
-        setLoading(false);
-        setAuthError(null);
-      },
-      (error) => {
-        console.error('Auth error:', error);
-        setAuthError(error.message);
-        setLoading(false);
+  // Find this section in your App.jsx and replace it:
+
+// ✅ NEW: Firebase authentication listener
+useEffect(() => {
+  const unsubscribe = onAuthStateChanged(auth, 
+    async (user) => {
+      console.log('Auth state changed:', user ? `${user.email} logged in` : 'User logged out');
+      
+      if (user) {
+        try {
+          // Initialize user profile in Firestore
+          const { initializeUserProfile } = await import('@/services/firestore');
+          await initializeUserProfile(user.uid, {
+            email: user.email,
+            displayName: user.displayName,
+            photoURL: user.photoURL,
+            lastLogin: new Date()
+          });
+          
+          setUser(user);
+          setAuthError(null);
+        } catch (error) {
+          console.error('Error initializing user profile:', error);
+          setAuthError('Failed to initialize user profile');
+        }
+      } else {
+        setUser(null);
       }
-    );
+      
+      setLoading(false);
+    },
+    (error) => {
+      console.error('Auth state change error:', error);
+      setAuthError(error.message);
+      setLoading(false);
+    }
+  );
 
-    return unsubscribe;
-  }, []);
-
+  return () => unsubscribe();
+}, []);
   // Onboarding form
   const [onboardingForm, setOnboardingForm] = useState({ fullName: '', birthday: '' });
   const handleCompleteOnboarding = () => {

@@ -1,16 +1,12 @@
-import React, { useState } from 'react';
-import { scheduleBirthdayReminders } from '@/services/notificationScheduler'; // ✅ YES, import here
-import { useSmartNotifications } from '@/hooks/useSmartNotifications';
+import React, { useState, useEffect } from 'react';
 import Modal from '@/components/ui/Modal';
 import Input from '@/components/ui/Input';
 import Button from '@/components/ui/Button';
-import { Plus, Loader2, AlertCircle, CheckCircle, WifiOff, Bell } from 'lucide-react';
-import { addBirthdayOptimized } from '@/services/firestore-cached';
-import localStorage from '@/services/localStorage';
+import { Edit3, Loader2, AlertCircle, CheckCircle, WifiOff } from 'lucide-react';
+import { updateBirthdayOptimized } from '@/services/firestore-cached'; // Updated import
+import localStorage from '@/services/localStorage'; // Add localStorage import
 
-const AddBirthdayModal = ({ isOpen, onClose, onAdd, userId }) => {
-  const { triggerNotificationPrompt } = useSmartNotifications();
-  
+const EditBirthdayModal = ({ isOpen, onClose, onUpdate, userId, birthday }) => {
   // Form state
   const [form, setForm] = useState({
     name: '',
@@ -24,11 +20,25 @@ const AddBirthdayModal = ({ isOpen, onClose, onAdd, userId }) => {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
-  const [notificationStatus, setNotificationStatus] = useState(''); // NEW: Track notification scheduling
   const [isOnline] = useState(localStorage.isOnline());
 
+  // Populate form when birthday changes or modal opens
+  useEffect(() => {
+    if (birthday && isOpen) {
+      setForm({
+        name: birthday.name || '',
+        date: birthday.date || '',
+        relation: birthday.relation || '',
+        avatar: birthday.avatar || '🎉',
+        isOnline: birthday.isOnline !== undefined ? birthday.isOnline : true,
+      });
+      setError('');
+      setSuccess(false);
+    }
+  }, [birthday, isOpen]);
+
   /**
-   * Handle form submission with notification scheduling
+   * Handle form submission with optimized caching
    */
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -42,13 +52,12 @@ const AddBirthdayModal = ({ isOpen, onClose, onAdd, userId }) => {
     // Clear previous states
     setError('');
     setSaving(true);
-    setNotificationStatus('Saving birthday...');
 
     try {
-      console.log('💾 Saving birthday (optimized)...');
+      console.log('💾 Updating birthday (optimized)...');
       
-      // Save using optimized service (instant cache + background sync)
-      const birthdayId = await addBirthdayOptimized(userId, {
+      // Update using optimized service (instant cache + background sync)
+      await updateBirthdayOptimized(userId, birthday.id, {
         name: form.name.trim(),
         date: form.date,
         relation: form.relation.trim(),
@@ -56,65 +65,35 @@ const AddBirthdayModal = ({ isOpen, onClose, onAdd, userId }) => {
         isOnline: form.isOnline
       });
 
-      console.log('✅ Birthday saved (optimized) with ID:', birthdayId);
-      setNotificationStatus('Scheduling reminders...');
+      console.log('✅ Birthday updated successfully (optimized)');
 
-      // 🔑 NEW: Schedule birthday reminder notifications
-      try {
-        const notificationResult = await scheduleBirthdayReminders(
-          {
-            id: birthdayId,
-            name: form.name.trim(),
-            date: form.date,
-            relation: form.relation.trim(),
-            avatar: form.avatar
-          },
-          userId
-        );
-
-        if (notificationResult.success) {
-          console.log('🔔 Birthday reminders scheduled successfully!');
-          setNotificationStatus('Reminders scheduled! You\'ll get notified 7 days before, 1 day before, and on the day! 🔔');
-        } else {
-          console.warn('⚠️ Birthday saved but reminders failed:', notificationResult.error);
-          setNotificationStatus('Birthday saved, but reminder scheduling failed. You can still get manual notifications.');
-        }
-      } catch (notificationError) {
-        console.error('❌ Notification scheduling failed:', notificationError);
-        setNotificationStatus('Birthday saved, but reminder scheduling failed. You can still get manual notifications.');
-      }
-
-      // Show success state
+      // Show success state briefly
       setSuccess(true);
-      
-      // Trigger notification prompt for immediate notifications
-      triggerNotificationPrompt(form.name);
 
       // Update parent component
-      onAdd({
-        id: birthdayId,
+      onUpdate({
+        ...birthday,
         ...form,
         name: form.name.trim(),
         relation: form.relation.trim()
       });
 
-      // Close modal after success display
+      // Close modal after brief success display
       setTimeout(() => {
         handleClose();
-      }, 2500); // Longer timeout to show notification status
+      }, 1000);
 
     } catch (err) {
-      console.error('❌ Failed to save birthday:', err);
+      console.error('❌ Failed to update birthday:', err);
       
       // For offline errors, still show success since it's cached locally
       if (!isOnline) {
         setSuccess(true);
-        setError(''); 
-        setNotificationStatus('Birthday saved offline! Reminders will be scheduled when back online.');
+        setError(''); // Clear any error since offline save is valid
         
-        // Update parent component with optimistic data
-        onAdd({
-          id: `temp_${Date.now()}`,
+        // Update parent component with updated data
+        onUpdate({
+          ...birthday,
           ...form,
           name: form.name.trim(),
           relation: form.relation.trim()
@@ -122,10 +101,9 @@ const AddBirthdayModal = ({ isOpen, onClose, onAdd, userId }) => {
         
         setTimeout(() => {
           handleClose();
-        }, 2500);
+        }, 1500);
       } else {
-        setError(err.message || 'Failed to save birthday. Please try again.');
-        setNotificationStatus('');
+        setError(err.message || 'Failed to update birthday. Please try again.');
       }
     } finally {
       setSaving(false);
@@ -147,7 +125,6 @@ const AddBirthdayModal = ({ isOpen, onClose, onAdd, userId }) => {
     });
     setError('');
     setSuccess(false);
-    setNotificationStatus('');
     setSaving(false);
     onClose();
   };
@@ -161,6 +138,8 @@ const AddBirthdayModal = ({ isOpen, onClose, onAdd, userId }) => {
     if (error) setError('');
   };
 
+  if (!birthday) return null;
+
   return (
     <Modal isOpen={isOpen} onClose={handleClose} showCloseButton={!saving}>
       <div className="space-y-6">
@@ -170,27 +149,27 @@ const AddBirthdayModal = ({ isOpen, onClose, onAdd, userId }) => {
           <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 shadow-xl transition-all duration-300 ${
             success 
               ? 'bg-gradient-to-r from-green-400 to-green-600' 
-              : 'bg-gradient-to-r from-pink-400 to-purple-500'
+              : 'bg-gradient-to-r from-blue-400 to-blue-600'
           }`}>
             {success ? (
               <CheckCircle className="w-8 h-8 text-white" />
             ) : saving ? (
               <Loader2 className="w-8 h-8 text-white animate-spin" />
             ) : (
-              <Plus className="w-8 h-8 text-white" />
+              <Edit3 className="w-8 h-8 text-white" />
             )}
           </div>
           
           <h3 className="text-xl font-bold text-gray-800 mb-2">
-            {success ? '🎉 Birthday Added!' : 'Add a Birthday 🎂'}
+            {success ? '✅ Birthday Updated!' : 'Edit Birthday 📝'}
           </h3>
           
           <p className="text-gray-600">
             {success 
               ? !isOnline 
-                ? `${form.name}'s birthday saved locally! Will sync when back online.`
-                : `${form.name}'s birthday has been saved successfully!`
-              : 'Add a friend\'s birthday to start celebrating!'
+                ? `${form.name}'s birthday updated locally! Will sync when back online.`
+                : `${form.name}'s birthday has been updated successfully!`
+              : `Update ${birthday.name}'s birthday information`
             }
           </p>
 
@@ -203,35 +182,16 @@ const AddBirthdayModal = ({ isOpen, onClose, onAdd, userId }) => {
           )}
         </div>
 
-        {/* Success State with Notification Status */}
+        {/* Success State */}
         {success && (
-          <div className="text-center py-4 space-y-3">
+          <div className="text-center py-4">
             <div className={`font-medium ${
               isOnline ? 'text-green-600' : 'text-blue-600'
             }`}>
               {isOnline 
-                ? 'Birthday saved successfully! 🎉'
-                : 'Birthday saved offline! Will sync automatically. 📱'
+                ? 'Changes saved and synced! 🎉'
+                : 'Changes saved offline! Will sync automatically. 📱'
               }
-            </div>
-            
-            {/* Notification Status */}
-            {notificationStatus && (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                <div className="flex items-center justify-center space-x-2 text-blue-700">
-                  <Bell className="w-4 h-4" />
-                  <span className="text-sm">{notificationStatus}</span>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Loading Status */}
-        {saving && notificationStatus && (
-          <div className="text-center py-2">
-            <div className="text-sm text-gray-600">
-              {notificationStatus}
             </div>
           </div>
         )}
@@ -280,7 +240,7 @@ const AddBirthdayModal = ({ isOpen, onClose, onAdd, userId }) => {
                 onChange={(e) => handleInputChange('relation', e.target.value)}
                 disabled={saving}
                 required
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
               >
                 <option value="">Select relationship</option>
                 <option value="Family">Family</option>
@@ -312,8 +272,8 @@ const AddBirthdayModal = ({ isOpen, onClose, onAdd, userId }) => {
                     disabled={saving}
                     className={`w-12 h-12 text-2xl rounded-lg border-2 transition-all hover:scale-110 disabled:hover:scale-100 disabled:opacity-50 ${
                       form.avatar === emoji
-                        ? 'border-purple-500 bg-purple-50'
-                        : 'border-gray-200 hover:border-purple-300'
+                        ? 'border-blue-500 bg-blue-50'
+                        : 'border-gray-200 hover:border-blue-300'
                     }`}
                   >
                     {emoji}
@@ -322,8 +282,18 @@ const AddBirthdayModal = ({ isOpen, onClose, onAdd, userId }) => {
               </div>
             </div>
 
-            {/* Submit Button */}
-            <div className="pt-4">
+            {/* Submit Buttons */}
+            <div className="flex space-x-3 pt-4">
+              <Button 
+                type="button"
+                variant="outline" 
+                onClick={handleClose}
+                disabled={saving}
+                fullWidth
+              >
+                Cancel
+              </Button>
+              
               <Button 
                 type="submit" 
                 variant="primary"
@@ -331,19 +301,8 @@ const AddBirthdayModal = ({ isOpen, onClose, onAdd, userId }) => {
                 loading={saving}
                 fullWidth
               >
-                {saving ? 'Saving Birthday...' : 'Save Birthday'}
+                {saving ? 'Updating...' : 'Update Birthday'}
               </Button>
-              
-              {/* Cancel Button */}
-              {!saving && (
-                <button
-                  type="button"
-                  onClick={handleClose}
-                  className="w-full mt-3 px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
-                >
-                  Cancel
-                </button>
-              )}
             </div>
           </form>
         )}
@@ -352,4 +311,4 @@ const AddBirthdayModal = ({ isOpen, onClose, onAdd, userId }) => {
   );
 };
 
-export default AddBirthdayModal;
+export default EditBirthdayModal;

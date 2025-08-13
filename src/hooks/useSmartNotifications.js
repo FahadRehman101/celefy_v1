@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { STORAGE_KEYS } from '@/utils/constants';
 
 export const useSmartNotifications = () => {
   const [showPrompt, setShowPrompt] = useState(false);
@@ -12,11 +13,11 @@ export const useSmartNotifications = () => {
     if (Notification.permission === 'granted') return false;
     
     // Don't show if user said "maybe later" recently
-    const delayUntil = localStorage.getItem('notificationPromptDelay');
+    const delayUntil = localStorage.getItem(STORAGE_KEYS.NOTIFICATION_PROMPT_DELAY);
     if (delayUntil && Date.now() < parseInt(delayUntil)) return false;
     
     // Don't show if user permanently dismissed
-    if (localStorage.getItem('notificationPromptDismissed') === 'true') return false;
+    if (localStorage.getItem(STORAGE_KEYS.NOTIFICATION_PROMPT_DISMISSED) === 'true') return false;
     
     return true;
   };
@@ -44,7 +45,7 @@ export const useSmartNotifications = () => {
         // Already handled in component
         break;
       case 'dismissed':
-        localStorage.setItem('notificationPromptDismissed', 'true');
+        localStorage.setItem(STORAGE_KEYS.NOTIFICATION_PROMPT_DISMISSED, 'true');
         break;
     }
   };
