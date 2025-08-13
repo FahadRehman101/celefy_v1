@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { onAuthStateChanged } from 'firebase/auth';
+import { auth } from '@/config/firebase';
 import { Gift } from 'lucide-react';
 
 import BirthdayNotificationPrompt from '@/components/notifications/BirthdayNotificationPrompt';
@@ -12,7 +14,6 @@ import Stories from '@/pages/Stories';
 
 import OnboardingModal from '@/components/onboarding/OnboardingModal';
 import Navigation from '@/components/layout/Navigation';
-// REMOVED: import OneSignalTester from '@/components/OneSignalTester';
 
 import {
   mockBirthdays,
@@ -21,8 +22,11 @@ import {
 } from '@/utils/placeholders';
 
 const App = () => {
-  // User auth placeholder
-  const [user, setUser] = useState({ displayName: 'Fahad Rehman', uid: 'placeholder-user-id' });
+  // ✅ CHANGED: Real authentication state
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [authError, setAuthError] = useState(null);
+  
   const [darkMode, setDarkMode] = useState(false);
   const [currentPage, setCurrentPage] = useState('dashboard');
 
@@ -37,13 +41,32 @@ const App = () => {
     setShowDenied
   } = useSmartNotifications();
 
+  // ✅ NEW: Firebase authentication listener
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, 
+      (user) => {
+        console.log('Auth state changed:', user ? user.email : 'No user');
+        setUser(user);
+        setLoading(false);
+        setAuthError(null);
+      },
+      (error) => {
+        console.error('Auth error:', error);
+        setAuthError(error.message);
+        setLoading(false);
+      }
+    );
+
+    return unsubscribe;
+  }, []);
+
   // Onboarding form
   const [onboardingForm, setOnboardingForm] = useState({ fullName: '', birthday: '' });
   const handleCompleteOnboarding = () => {
     console.log('Onboarding completed:', onboardingForm);
   };
 
-  // Birthday filters
+  // Birthday filters (keep existing logic)
   const [birthdays, setBirthdays] = useState(mockBirthdays);
   const [selectedFilter, setSelectedFilter] = useState('All');
   const [searchTerm, setSearchTerm] = useState('');
@@ -66,33 +89,32 @@ const App = () => {
   };
 
   const filteredBirthdays = birthdays.filter((b) => {
-    if (selectedFilter === 'Today') return isToday(b.date);
-    if (selectedFilter === 'This Month') return isThisMonth(b.date);
-    if (selectedFilter === 'Upcoming') return isUpcoming(b.date);
-    return true;
-  }).filter((b) =>
-    b.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+    if (selectedFilter === 'Today') return isToday(b.date) && b.name.toLowerCase().includes(searchTerm.toLowerCase());
+    if (selectedFilter === 'This Month') return isThisMonth(b.date) && b.name.toLowerCase().includes(searchTerm.toLowerCase());
+    if (selectedFilter === 'Upcoming') return isUpcoming(b.date) && b.name.toLowerCase().includes(searchTerm.toLowerCase());
+    return b.name.toLowerCase().includes(searchTerm.toLowerCase());
+  });
 
-  const todaysBirthdays = birthdays.filter((b) => isToday(b.date)).length;
-  const thisMonthBirthdays = birthdays.filter((b) => isThisMonth(b.date)).length;
-  const next7DaysBirthdays = birthdays.filter((b) => isUpcoming(b.date)).length;
+  const todaysBirthdays = birthdays.filter(isToday);
+  const thisMonthBirthdays = birthdays.filter(isThisMonth);
+  const next7DaysBirthdays = birthdays.filter(isUpcoming);
 
-  // Stories
-  const [storyForm, setStoryForm] = useState({ title: '', story: '' });
+  // Stories (keep existing)
+  const [storyForm, setStoryForm] = useState({ title: '', content: '', image: '' });
   const [stories, setStories] = useState(mockStories);
+
   const handleAddStory = () => {
-    if (!storyForm.title || !storyForm.story) return;
-    const newStory = {
-      id: stories.length + 1,
-      title: storyForm.title,
-      story: storyForm.story,
-      author: user.displayName || 'Anonymous',
-      date: new Date().toISOString(),
-      likes: 0,
-    };
-    setStories([newStory, ...stories]);
-    setStoryForm({ title: '', story: '' });
+    if (storyForm.title && storyForm.content) {
+      const newStory = {
+        id: Date.now(),
+        ...storyForm,
+        author: user?.displayName || user?.email || 'Anonymous',
+        date: new Date().toLocaleDateString(),
+        likes: 0
+      };
+      setStories([newStory, ...stories]);
+      setStoryForm({ title: '', content: '', image: '' });
+    }
   };
 
   const handleLikeStory = (id) => {
@@ -100,13 +122,54 @@ const App = () => {
     setStories(updated);
   };
 
-  const handleSignOut = () => {
-    console.log('User signed out');
-    setUser(null);
+  const handleSignOut = async () => {
+    try {
+      const { signOut } = await import('firebase/auth');
+      await signOut(auth);
+      console.log('User signed out successfully');
+    } catch (error) {
+      console.error('Sign out error:', error);
+    }
   };
 
-  if (!user) return <Login />;
+  // ✅ NEW: Loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-pink-50 via-purple-50 to-blue-50">
+        <div className="text-center">
+          <div className="bg-gradient-to-r from-pink-500 to-purple-600 p-4 rounded-2xl mx-auto w-fit mb-4 animate-pulse">
+            <Gift className="w-8 h-8 text-white" />
+          </div>
+          <div className="text-xl font-semibold text-gray-700">Loading Celefy...</div>
+        </div>
+      </div>
+    );
+  }
 
+  // ✅ NEW: Auth error state
+  if (authError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-pink-50 via-purple-50 to-blue-50">
+        <div className="bg-white p-8 rounded-2xl shadow-xl max-w-md w-full text-center">
+          <div className="text-red-500 mb-4">Authentication Error</div>
+          <div className="text-gray-700 mb-4">{authError}</div>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="bg-pink-500 text-white px-4 py-2 rounded-lg hover:bg-pink-600"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ✅ NEW: Show login if no user
+  if (!user) {
+    return <Login />;
+  }
+
+  // ✅ EXISTING: Main app when user is authenticated
   return (
     <div className={`min-h-screen ${darkMode ? 'dark bg-gray-900' : 'bg-gradient-to-br from-pink-50 via-purple-50 to-blue-50'}`}>
       <Navigation
@@ -133,7 +196,6 @@ const App = () => {
             searchTerm={searchTerm}
             setSearchTerm={setSearchTerm}
           />
-         
         )}
         {currentPage === 'celebrities' && (
           <CelebrityBirthdays
@@ -157,7 +219,6 @@ const App = () => {
         handleCompleteOnboarding={handleCompleteOnboarding}
       />
 
-      {/* Beautiful notification modals */}
       <BirthdayNotificationPrompt
         isOpen={showPrompt}
         onClose={handlePromptResponse}

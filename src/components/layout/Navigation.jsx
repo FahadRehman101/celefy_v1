@@ -1,7 +1,21 @@
 import React from 'react';
 import { Home, Star, BookOpen, LogOut, Sun, Moon } from 'lucide-react';
+import { signOut } from 'firebase/auth';
+import { auth } from '@/config/firebase';
 
-const Navigation = ({ user, currentPage, setCurrentPage, darkMode, setDarkMode, handleSignOut }) => {
+const Navigation = ({ user, currentPage, setCurrentPage, darkMode, setDarkMode }) => {
+  
+  const handleSignOut = async () => {
+    try {
+      console.log('Signing out...');
+      await signOut(auth);
+      console.log('Sign out successful');
+    } catch (error) {
+      console.error('Sign out error:', error);
+      alert('Failed to sign out. Please try again.');
+    }
+  };
+
   return (
     <nav className="bg-white/80 backdrop-blur-md border-b border-pink-200 px-4 py-3 flex justify-between items-center shadow-sm">
       <div className="flex items-center space-x-4">
@@ -13,6 +27,7 @@ const Navigation = ({ user, currentPage, setCurrentPage, darkMode, setDarkMode, 
             Celefy
           </span>
         </div>
+        
         <button
           onClick={() => setCurrentPage('dashboard')}
           className={`ml-6 text-sm font-medium ${currentPage === 'dashboard' ? 'text-pink-600' : 'text-gray-600 hover:text-pink-600'}`}
@@ -37,12 +52,23 @@ const Navigation = ({ user, currentPage, setCurrentPage, darkMode, setDarkMode, 
         <button onClick={() => setDarkMode(!darkMode)}>
           {darkMode ? <Sun className="w-5 h-5 text-yellow-400" /> : <Moon className="w-5 h-5 text-gray-600" />}
         </button>
+        
+        {/* User Info */}
         <div className="w-8 h-8 bg-gradient-to-r from-pink-500 to-purple-500 text-white rounded-full flex items-center justify-center font-semibold">
-          {user?.displayName?.charAt(0) || 'U'}
+          {user?.displayName?.charAt(0) || user?.email?.charAt(0) || 'U'}
         </div>
-        <span className="text-sm font-medium text-gray-700">{user?.displayName}</span>
-        <button onClick={handleSignOut}>
-          <LogOut className="w-5 h-5 text-gray-600 hover:text-red-500" />
+        
+        <span className="text-sm font-medium text-gray-700 max-w-32 truncate">
+          {user?.displayName || user?.email?.split('@')[0] || 'User'}
+        </span>
+        
+        {/* Logout Button */}
+        <button 
+          onClick={handleSignOut}
+          className="text-gray-600 hover:text-red-500 transition-colors p-1 rounded-lg hover:bg-red-50"
+          title="Sign Out"
+        >
+          <LogOut className="w-5 h-5" />
         </button>
       </div>
     </nav>
