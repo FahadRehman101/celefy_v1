@@ -18,35 +18,78 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
 
-    <!-- OneSignal SDK - Using correct v16 version -->
+    <!-- OneSignal v16 SDK - FIXED VERSION -->
     <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
     
-    <!-- Test script to see if OneSignal loads -->
+    <!-- OneSignal v16 Loading Script - IMPROVED -->
     <script>
-      console.log('🚀 HTML loaded, checking OneSignal loading...');
+      console.log('🚀 Celefy: Starting OneSignal v16 detection...');
       
-      // Check if OneSignal loads
+      // OneSignal v16 detection with better error handling
       let checkCount = 0;
-      const checkOneSignalLoading = () => {
+      const maxChecks = 60; // Check for 60 seconds max
+      
+      const checkOneSignalV16Loading = () => {
         checkCount++;
-        const elapsed = Math.round((Date.now - performance.timing.navigationStart) / 1000);
+        const elapsed = Math.round((performance.now() - performance.timing.navigationStart) / 1000);
         
-        console.log(`🚀 OneSignal loading check #${checkCount} (${elapsed}s):`);
-        console.log(`🚀 - OneSignal exists: ${typeof window.OneSignal !== 'undefined'}`);
+        console.log(`🔍 OneSignal v16 check #${checkCount} (${elapsed}s elapsed):`);
         
         if (typeof window.OneSignal !== 'undefined') {
-          console.log('✅ OneSignal SDK loaded successfully!');
-          console.log('🚀 OneSignal object:', window.OneSignal);
-          console.log('🚀 OneSignal keys:', Object.keys(window.OneSignal));
-        } else if (checkCount < 60) { // Check for 60 seconds
-          setTimeout(checkOneSignalLoading, 1000);
+          console.log('✅ OneSignal v16 SDK loaded successfully!');
+          console.log('🔍 OneSignal object type:', typeof window.OneSignal);
+          console.log('🔍 OneSignal properties:', Object.keys(window.OneSignal));
+          
+          // Check for v16 specific properties
+          if (window.OneSignal.Slidedown || window.OneSignal.Notifications) {
+            console.log('✅ OneSignal v16 API detected!');
+          } else if (typeof window.OneSignal.init === 'function') {
+            console.log('✅ OneSignal init function available');
+          } else {
+            console.log('⚠️ OneSignal loaded but structure unknown');
+          }
+          
+          // Log version if available
+          if (window.OneSignal.VERSION) {
+            console.log('📱 OneSignal version:', window.OneSignal.VERSION);
+          }
+          
+          return; // Stop checking
+        }
+        
+        console.log(`🔍 - OneSignal exists: ${typeof window.OneSignal !== 'undefined'}`);
+        console.log(`🔍 - Window properties: ${Object.keys(window).filter(k => k.toLowerCase().includes('onesignal')).join(', ') || 'none'}`);
+        
+        if (checkCount < maxChecks) {
+          setTimeout(checkOneSignalV16Loading, 1000);
         } else {
-          console.error('❌ OneSignal SDK failed to load after 60 seconds!');
+          console.error('❌ OneSignal v16 SDK failed to load after 60 seconds!');
+          console.error('🔍 Final window check:', {
+            hasOneSignal: 'OneSignal' in window,
+            oneSignalType: typeof window.OneSignal,
+            windowKeys: Object.keys(window).filter(k => k.toLowerCase().includes('signal'))
+          });
         }
       };
       
-      // Start checking after a short delay
-      setTimeout(checkOneSignalLoading, 1000);
+      // Start checking after DOM loads
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => {
+          setTimeout(checkOneSignalV16Loading, 500);
+        });
+      } else {
+        setTimeout(checkOneSignalV16Loading, 500);
+      }
+      
+      // Also check when window loads
+      window.addEventListener('load', () => {
+        console.log('🚀 Window loaded, doing final OneSignal v16 check...');
+        if (typeof window.OneSignal !== 'undefined') {
+          console.log('✅ OneSignal v16 confirmed available on window load');
+        } else {
+          console.log('❌ OneSignal v16 still not available on window load');
+        }
+      });
     </script>
   </head>
 

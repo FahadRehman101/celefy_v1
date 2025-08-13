@@ -1,49 +1,51 @@
-importScripts("https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.sw.js");
+// OneSignalSDKWorker.js - OneSignal v16 Compatible Service Worker
+// This file should be placed in your public folder as OneSignalSDKWorker.js
 
-// Add custom notification handling
-self.addEventListener('push', (event) => {
-  if (event.data) {
-    try {
-      const data = event.data.json();
-      const options = {
-        body: data.message || 'You have a new notification!',
-        icon: '/icons/icon-192.png',
-        badge: '/icons/icon-192.png',
-        vibrate: [100, 50, 100],
-        data: {
-          dateOfArrival: Date.now(),
-          primaryKey: 1
-        },
-        actions: [
-          {
-            action: 'explore',
-            title: 'View',
-            icon: '/icons/icon-192.png'
-          },
-          {
-            action: 'close',
-            title: 'Close',
-            icon: '/icons/icon-192.png'
-          }
-        ]
-      };
+// Import OneSignal v16 service worker
+importScripts('https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.sw.js');
 
-      event.waitUntil(
-        self.registration.showNotification(data.title || 'Celefy Notification', options)
-      );
-    } catch (error) {
-      console.error('Error handling push notification:', error);
-    }
-  }
+// Optional: Add custom notification handling
+self.addEventListener('notificationclick', function(event) {
+  console.log('OneSignal v16: Notification clicked', event);
+  
+  // Close the notification
+  event.notification.close();
+  
+  // Handle the click action
+  event.waitUntil(
+    clients.matchAll().then(function(clientList) {
+      // If a client is already open, focus it
+      for (let i = 0; i < clientList.length; i++) {
+        const client = clientList[i];
+        if (client.url === '/' && 'focus' in client) {
+          return client.focus();
+        }
+      }
+      
+      // Otherwise open a new window/tab
+      if (clients.openWindow) {
+        return clients.openWindow('/');
+      }
+    })
+  );
 });
 
-// Handle notification clicks
-self.addEventListener('notificationclick', (event) => {
-  event.notification.close();
+// Custom notification display for Celefy
+self.addEventListener('push', function(event) {
+  console.log('OneSignal v16: Push notification received', event);
+  
+  // Let OneSignal handle the push event
+  // But you can add custom logic here if needed
+});
 
-  if (event.action === 'explore') {
-    event.waitUntil(
-      clients.openWindow('/')
-    );
-  }
+// Service worker install event
+self.addEventListener('install', function(event) {
+  console.log('OneSignal v16: Service worker installing');
+  self.skipWaiting(); // Force activation
+});
+
+// Service worker activate event
+self.addEventListener('activate', function(event) {
+  console.log('OneSignal v16: Service worker activated');
+  event.waitUntil(self.clients.claim()); // Take control immediately
 });
