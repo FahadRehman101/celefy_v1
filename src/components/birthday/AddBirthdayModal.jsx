@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
+import { useSmartNotifications } from '@/hooks/useSmartNotifications';
 import Modal from '@/components/ui/Modal';
 import Input from '@/components/ui/Input';
 import Button from '@/components/ui/Button';
 import { Plus } from 'lucide-react';
 
 const AddBirthdayModal = ({ isOpen, onClose, onAdd }) => {
+  const { triggerNotificationPrompt } = useSmartNotifications();
   const [form, setForm] = useState({
     name: '',
     date: '',
@@ -12,6 +14,9 @@ const AddBirthdayModal = ({ isOpen, onClose, onAdd }) => {
     avatar: '🎉',
     isOnline: true,
   });
+
+ 
+
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -23,6 +28,9 @@ const AddBirthdayModal = ({ isOpen, onClose, onAdd }) => {
     };
 
     onAdd(newBirthday); // <- update parent state
+
+    triggerNotificationPrompt(form.name);
+
     onClose();
     setForm({
       name: '',

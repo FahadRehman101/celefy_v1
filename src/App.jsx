@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Gift } from 'lucide-react';
 
+import BirthdayNotificationPrompt from '@/components/notifications/BirthdayNotificationPrompt';
+import { NotificationSuccessModal, NotificationDeniedModal } from '@/components/notifications/NotificationFeedback';
+import { useSmartNotifications } from '@/hooks/useSmartNotifications';
+
 import Login from '@/pages/Login';
 import Dashboard from '@/pages/Dashboard';
 import CelebrityBirthdays from '@/pages/CelebrityBirthdays';
@@ -8,7 +12,7 @@ import Stories from '@/pages/Stories';
 
 import OnboardingModal from '@/components/onboarding/OnboardingModal';
 import Navigation from '@/components/layout/Navigation';
-import OneSignalTester from '@/components/OneSignalTester';
+// REMOVED: import OneSignalTester from '@/components/OneSignalTester';
 
 import {
   mockBirthdays,
@@ -16,13 +20,22 @@ import {
   mockStories
 } from '@/utils/placeholders';
 
-// OneSignalTester component moved to separate file
-
 const App = () => {
   // User auth placeholder
   const [user, setUser] = useState({ displayName: 'Fahad Rehman', uid: 'placeholder-user-id' });
   const [darkMode, setDarkMode] = useState(false);
   const [currentPage, setCurrentPage] = useState('dashboard');
+
+  // Smart notifications hook
+  const {
+    showPrompt,
+    showSuccess,
+    showDenied,
+    promptData,
+    handlePromptResponse,
+    setShowSuccess,
+    setShowDenied
+  } = useSmartNotifications();
 
   // Onboarding form
   const [onboardingForm, setOnboardingForm] = useState({ fullName: '', birthday: '' });
@@ -107,24 +120,20 @@ const App = () => {
 
       <main className="max-w-7xl mx-auto px-4 py-8">
         {currentPage === 'dashboard' && (
-          <>
-            <Dashboard
-              user={user}
-              birthdays={birthdays}
-              setBirthdays={setBirthdays}
-              filteredBirthdays={filteredBirthdays}
-              todaysBirthdays={todaysBirthdays}
-              thisMonthBirthdays={thisMonthBirthdays}
-              next7DaysBirthdays={next7DaysBirthdays}
-              selectedFilter={selectedFilter}
-              setSelectedFilter={setSelectedFilter}
-              searchTerm={searchTerm}
-              setSearchTerm={setSearchTerm}
-            />
-
-            {/* OneSignal subscribe button */}
-            <OneSignalTester />
-          </>
+          <Dashboard
+            user={user}
+            birthdays={birthdays}
+            setBirthdays={setBirthdays}
+            filteredBirthdays={filteredBirthdays}
+            todaysBirthdays={todaysBirthdays}
+            thisMonthBirthdays={thisMonthBirthdays}
+            next7DaysBirthdays={next7DaysBirthdays}
+            selectedFilter={selectedFilter}
+            setSelectedFilter={setSelectedFilter}
+            searchTerm={searchTerm}
+            setSearchTerm={setSearchTerm}
+          />
+         
         )}
         {currentPage === 'celebrities' && (
           <CelebrityBirthdays
@@ -146,6 +155,23 @@ const App = () => {
         onboardingForm={onboardingForm}
         setOnboardingForm={setOnboardingForm}
         handleCompleteOnboarding={handleCompleteOnboarding}
+      />
+
+      {/* Beautiful notification modals */}
+      <BirthdayNotificationPrompt
+        isOpen={showPrompt}
+        onClose={handlePromptResponse}
+        friendName={promptData.friendName}
+      />
+
+      <NotificationSuccessModal
+        isOpen={showSuccess}
+        onClose={() => setShowSuccess(false)}
+      />
+
+      <NotificationDeniedModal
+        isOpen={showDenied}
+        onClose={() => setShowDenied(false)}
       />
 
       <footer className="bg-white/80 backdrop-blur-md border-t border-pink-200 py-8 mt-16">
