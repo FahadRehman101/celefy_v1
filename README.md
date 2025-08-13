@@ -42,16 +42,31 @@ npm install
 
 3. Set up environment variables
 ```bash
-# Copy .env.example to .env and fill in your Firebase config
-cp .env.example .env
+# Copy env.example to .env and fill in your configuration
+cp env.example .env
 ```
+
+4. Configure OneSignal (Required for push notifications)
+   - Go to [OneSignal Dashboard](https://app.onesignal.com/)
+   - Create a new app or use existing one
+   - Copy your App ID and REST API Key
+   - Update `.env` file with your OneSignal credentials:
+   ```bash
+   VITE_ONESIGNAL_APP_ID=your_app_id_here
+   VITE_ONESIGNAL_REST_API_KEY=your_rest_api_key_here
+   ```
 
 4. Start development server
 ```bash
 npm run dev
 ```
 
-5. Build for production
+5. Start development server
+```bash
+npm run dev
+```
+
+6. Build for production
 ```bash
 npm run build
 ```
@@ -68,6 +83,23 @@ npm run build
 The app is configured for deployment on:
 - **Netlify** (via `netlify.toml`)
 - **Firebase Hosting** (via `firebase.json`)
+
+## Troubleshooting
+
+### OneSignal Configuration Issues
+
+If you see the error "OneSignal configuration missing", follow these steps:
+
+1. **Check your `.env` file** - Ensure it contains the required OneSignal variables
+2. **Verify credentials** - Double-check your App ID and REST API Key from OneSignal dashboard
+3. **Restart dev server** - After updating `.env`, restart your development server
+4. **Check debug panel** - Use the debug components to verify configuration status
+
+### Common Issues
+
+- **Push notifications not working**: Ensure HTTPS in production and proper OneSignal setup
+- **Service worker errors**: Check browser console and ensure PWA files are properly configured
+- **Firebase connection issues**: Verify your Firebase configuration and rules
 
 ## Contributing
 

@@ -3,8 +3,10 @@
  * Schedules birthday reminders that work without the app being opened
  */
 
-const ONESIGNAL_APP_ID = "b714db0f-1b9e-4b4b-87fb-1d52c3309714";
-const ONESIGNAL_REST_API_KEY = "os_v2_app_w4knwdy3tzfuxb73dvjmgmexcscl4ueqd6uuqw4l4wiq3bt73qboswce2a2n3qqduy7qfjylxa7kltawenso7zfg36ju67kxxqy7d3q"; // Get this from OneSignal dashboard
+import { getOneSignalConfig, isOneSignalConfigured } from '@/config/onesignal';
+
+// Get configuration safely
+const config = getOneSignalConfig();
 
 /**
  * Schedule all birthday notifications when birthday is added
@@ -12,6 +14,16 @@ const ONESIGNAL_REST_API_KEY = "os_v2_app_w4knwdy3tzfuxb73dvjmgmexcscl4ueqd6uuqw
  */
 export const scheduleBirthdayReminders = async (birthday, userId) => {
   console.log('📅 Scheduling birthday reminders for:', birthday.name);
+
+  // Check if OneSignal is configured
+  if (!isOneSignalConfigured()) {
+    console.warn('⚠️ OneSignal not configured. Cannot schedule notifications.');
+    return { 
+      success: false, 
+      error: 'OneSignal not configured. Please check your environment variables.',
+      requiresConfig: true
+    };
+  }
 
   try {
     // Calculate notification dates
@@ -107,21 +119,19 @@ export const scheduleBirthdayReminders = async (birthday, userId) => {
  */
 const scheduleOneSignalNotification = async (notificationData) => {
   const payload = {
-    app_id: ONESIGNAL_APP_ID,
+    app_id: config.appId,
     include_external_user_ids: [notificationData.userId],
     headings: { "en": notificationData.title },
     contents: { "en": notificationData.message },
     send_after: notificationData.sendAfter, // 🔑 This is the magic!
     data: notificationData.data,
     
-    // Notification settings
-    android_accent_color: "FF9C27B0",
-    small_icon: "ic_notification",
-    large_icon: "https://your-app-domain.com/icon-512.png",
-    
-    // Make it high priority
-    priority: 10,
-    android_channel_id: "birthday-reminders"
+    // Notification settings from config
+    android_accent_color: config.notificationSettings.androidAccentColor,
+    small_icon: config.notificationSettings.smallIcon,
+    large_icon: config.notificationSettings.largeIcon,
+    priority: config.notificationSettings.priority,
+    android_channel_id: config.notificationSettings.androidChannelId
   };
   
   console.log('📤 Scheduling OneSignal notification:', {
@@ -134,7 +144,7 @@ const scheduleOneSignalNotification = async (notificationData) => {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Basic ${os_v2_app_w4knwdy3tzfuxb73dvjmgmexcscl4ueqd6uuqw4l4wiq3bt73qboswce2a2n3qqduy7qfjylxa7kltawenso7zfg36ju67kxxqy7d3q}`
+      'Authorization': `Basic ${config.restApiKey}`
     },
     body: JSON.stringify(payload)
   });
@@ -156,12 +166,22 @@ const scheduleOneSignalNotification = async (notificationData) => {
 export const cancelBirthdayReminders = async (notificationIds) => {
   console.log('🚫 Cancelling scheduled notifications:', notificationIds);
   
+  // Check if OneSignal is configured
+  if (!isOneSignalConfigured()) {
+    console.warn('⚠️ OneSignal not configured. Cannot cancel notifications.');
+    return { 
+      success: false, 
+      error: 'OneSignal not configured. Please check your environment variables.',
+      requiresConfig: true
+    };
+  }
+
   try {
     const cancelPromises = notificationIds.map(async (id) => {
       const response = await fetch(`https://onesignal.com/api/v1/notifications/${id}`, {
         method: 'DELETE',
         headers: {
-          'Authorization': `Basic ${os_v2_app_w4knwdy3tzfuxb73dvjmgmexcscl4ueqd6uuqw4l4wiq3bt73qboswce2a2n3qqduy7qfjylxa7kltawenso7zfg36ju67kxxqy7d3q}`
+          'Authorization': `Basic ${config.restApiKey}`
         }
       });
       
@@ -183,6 +203,16 @@ export const cancelBirthdayReminders = async (notificationIds) => {
  */
 export const rescheduleForNextYear = async (birthdays, userId) => {
   console.log('🔄 Rescheduling notifications for next year...');
+  
+  // Check if OneSignal is configured
+  if (!isOneSignalConfigured()) {
+    console.warn('⚠️ OneSignal not configured. Cannot reschedule notifications.');
+    return { 
+      success: false, 
+      error: 'OneSignal not configured. Please check your environment variables.',
+      requiresConfig: true
+    };
+  }
   
   for (const birthday of birthdays) {
     await scheduleBirthdayReminders(birthday, userId);

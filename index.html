@@ -22,20 +22,23 @@
     <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
 
 <script>
-  // In your OneSignal setup (index.html or main component)
-window.OneSignal = window.OneSignal || [];
-OneSignal.push(function() {
-  OneSignal.init({
-    appId: "b714db0f-1b9e-4b4b-87fb-1d52c3309714",
-    // ... other config
+  // OneSignal initialization with centralized configuration
+  window.OneSignal = window.OneSignal || [];
+  OneSignal.push(function() {
+    OneSignal.init({
+      appId: "b714db0f-1b9e-4b4b-87fb-1d52c3309714",
+      safari_web_id: "web.onesignal.auto.145f18a4-510a-4781-b676-50fa3f7fa700",
+      notifyButton: { enable: true },
+      allowLocalhostAsSecureOrigin: true,
+      autoRegister: false,
+      welcomeNotification: {
+        title: "Welcome to Celefy! 🎉",
+        message: "Get notified about birthdays and celebrations!"
+      }
+    });
+    
+    console.log('✅ OneSignal initialized successfully');
   });
-  
-  // When user logs in, set external user ID
-  if (user?.uid) {
-    OneSignal.setExternalUserId(user.uid);
-    console.log('✅ OneSignal external user ID set:', user.uid);
-  }
-});
 </script>
 
   <body class="bg-light dark:bg-dark">

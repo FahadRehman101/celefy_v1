@@ -1,3 +1,5 @@
+import { getOneSignalConfig, isOneSignalConfigured } from '@/config/onesignal';
+
 const waitForOneSignal = () => {
   return new Promise((resolve, reject) => {
     if (typeof window.OneSignal !== 'undefined') {
@@ -68,7 +70,14 @@ export const requestPermission = async () => {
  */
 export const sendTestNotification = async () => {
   try {
+    // Check if OneSignal is configured
+    if (!isOneSignalConfigured()) {
+      console.warn('⚠️ OneSignal not configured. Cannot send test notification.');
+      throw new Error('OneSignal not configured');
+    }
+
     const OneSignal = await waitForOneSignal();
+    const config = getOneSignalConfig();
     
     // Get the user's OneSignal ID
     const userId = await OneSignal.User.PushSubscription.id;
@@ -82,10 +91,10 @@ export const sendTestNotification = async () => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': 'Basic os_v2_app_w4knwdy3tzfuxb73dvjmgmexctwwjbe7rq4e654bolid4wgfk5cyj66gi2rm3rmm5vfvhra7uoabibeao7zupkil65bx5mo4qnkqfti' // Replace with your REST API key
+        'Authorization': `Basic ${config.restApiKey}`
       },
       body: JSON.stringify({
-        app_id: "b714db0f-1b9e-4b4b-87fb-1d52c3309714",
+        app_id: config.appId,
         include_player_ids: [userId],
         headings: { en: "🎂 Test from Celefy!" },
         contents: { en: "Your push notifications are working perfectly! 🎉" },
@@ -142,6 +151,7 @@ export const getDebugInfo = () => {
     notificationSupport: 'Notification' in window,
     permission: Notification.permission,
     isHttps: location.protocol === 'https:',
-    domain: location.hostname
+    domain: location.hostname,
+    oneSignalConfigured: isOneSignalConfigured()
   };
 };

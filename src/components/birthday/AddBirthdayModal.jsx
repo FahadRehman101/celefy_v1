@@ -30,108 +30,109 @@ const AddBirthdayModal = ({ isOpen, onClose, onAdd, userId }) => {
   /**
    * Handle form submission with notification scheduling
    */
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+ /**
+ * Handle form submission with offline notification queue support
+ */
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  
+  // Validation
+  if (!form.name.trim() || !form.date || !form.relation.trim()) {
+    setError('Please fill in all required fields');
+    return;
+  }
+
+  // Clear previous states
+  setError('');
+  setSaving(true);
+  setNotificationStatus('Saving birthday...');
+
+  try {
+    console.log('💾 Saving birthday (optimized)...');
     
-    // Validation
-    if (!form.name.trim() || !form.date || !form.relation.trim()) {
-      setError('Please fill in all required fields');
-      return;
-    }
+    // Save using optimized service (instant cache + background sync)
+    const birthdayId = await addBirthdayOptimized(userId, {
+      name: form.name.trim(),
+      date: form.date,
+      relation: form.relation.trim(),
+      avatar: form.avatar,
+      isOnline: form.isOnline
+    });
 
-    // Clear previous states
-    setError('');
-    setSaving(true);
-    setNotificationStatus('Saving birthday...');
+    console.log('✅ Birthday saved (optimized) with ID:', birthdayId);
+    
+    // Prepare birthday data for notification scheduling
+    const birthdayData = {
+      id: birthdayId,
+      name: form.name.trim(),
+      date: form.date,
+      relation: form.relation.trim(),
+      avatar: form.avatar
+    };
 
+    // 🔑 NEW: Smart notification scheduling with offline support
+    setNotificationStatus('Scheduling reminders...');
+    
     try {
-      console.log('💾 Saving birthday (optimized)...');
-      
-      // Save using optimized service (instant cache + background sync)
-      const birthdayId = await addBirthdayOptimized(userId, {
-        name: form.name.trim(),
-        date: form.date,
-        relation: form.relation.trim(),
-        avatar: form.avatar,
-        isOnline: form.isOnline
-      });
-
-      console.log('✅ Birthday saved (optimized) with ID:', birthdayId);
-      setNotificationStatus('Scheduling reminders...');
-
-      // 🔑 NEW: Schedule birthday reminder notifications
-      try {
-        const notificationResult = await scheduleBirthdayReminders(
-          {
-            id: birthdayId,
-            name: form.name.trim(),
-            date: form.date,
-            relation: form.relation.trim(),
-            avatar: form.avatar
-          },
-          userId
-        );
-
+      // Check if we're online and try immediate scheduling
+      if (navigator.onLine) {
+        console.log('📶 Online - attempting immediate notification scheduling...');
+        
+        const notificationResult = await scheduleBirthdayReminders(birthdayData, userId);
+        
         if (notificationResult.success) {
           console.log('🔔 Birthday reminders scheduled successfully!');
-          setNotificationStatus('Reminders scheduled! You\'ll get notified 7 days before, 1 day before, and on the day! 🔔');
+          setNotificationStatus('Perfect! Reminders scheduled for 7 days before, 1 day before, and on the day! 🔔');
+        } else if (notificationResult.requiresConfig) {
+          // OneSignal not configured - show helpful message
+          console.warn('⚠️ OneSignal not configured:', notificationResult.error);
+          setNotificationStatus('Birthday saved! 🔔 Enable notifications in settings to get birthday reminders.');
         } else {
-          console.warn('⚠️ Birthday saved but reminders failed:', notificationResult.error);
-          setNotificationStatus('Birthday saved, but reminder scheduling failed. You can still get manual notifications.');
+          throw new Error(notificationResult.error || 'Scheduling failed');
         }
-      } catch (notificationError) {
-        console.error('❌ Notification scheduling failed:', notificationError);
-        setNotificationStatus('Birthday saved, but reminder scheduling failed. You can still get manual notifications.');
+      } else {
+        // We're offline, queue for later
+        throw new Error('Currently offline');
       }
-
-      // Show success state
-      setSuccess(true);
       
-      // Trigger notification prompt for immediate notifications
-      triggerNotificationPrompt(form.name);
+    } catch (schedulingError) {
+      console.warn('⚠️ Immediate scheduling failed, queuing for when online:', schedulingError.message);
+      
+      // Import queue function dynamically to avoid circular dependencies
+      const { queueNotificationScheduling } = await import('@/services/notificationQueue');
+      
+      const queueResult = await queueNotificationScheduling(birthdayId, birthdayData, userId);
+      
+      if (queueResult.success) {
+        setNotificationStatus('Birthday saved! 📱 Reminders will be scheduled automatically when you\'re back online.');
+      } else {
+        setNotificationStatus('Birthday saved, but reminder scheduling failed. You can manually enable notifications later.');
+      }
+    }
 
-      // Update parent component
+    // Success UI updates
+    setSuccess(true);
+    
+    // Call parent callback to refresh birthday list
+    if (onAdd) {
       onAdd({
         id: birthdayId,
-        ...form,
-        name: form.name.trim(),
-        relation: form.relation.trim()
+        ...birthdayData
       });
-
-      // Close modal after success display
-      setTimeout(() => {
-        handleClose();
-      }, 2500); // Longer timeout to show notification status
-
-    } catch (err) {
-      console.error('❌ Failed to save birthday:', err);
-      
-      // For offline errors, still show success since it's cached locally
-      if (!isOnline) {
-        setSuccess(true);
-        setError(''); 
-        setNotificationStatus('Birthday saved offline! Reminders will be scheduled when back online.');
-        
-        // Update parent component with optimistic data
-        onAdd({
-          id: `temp_${Date.now()}`,
-          ...form,
-          name: form.name.trim(),
-          relation: form.relation.trim()
-        });
-        
-        setTimeout(() => {
-          handleClose();
-        }, 2500);
-      } else {
-        setError(err.message || 'Failed to save birthday. Please try again.');
-        setNotificationStatus('');
-      }
-    } finally {
-      setSaving(false);
     }
-  };
 
+    // Auto-close modal after short delay
+    setTimeout(() => {
+      handleClose();
+    }, 2000);
+
+  } catch (error) {
+    console.error('❌ Error saving birthday:', error);
+    setError(error.message || 'Failed to save birthday. Please try again.');
+  } finally {
+    setSaving(false);
+  }
+};
   /**
    * Close modal and reset form
    */

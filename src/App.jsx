@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+// Add this import with your existing imports
+import { processNotificationQueue, getQueueStats } from '@/services/notificationQueue';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/config/firebase';
 import { Gift } from 'lucide-react';
@@ -44,7 +46,7 @@ const App = () => {
   // ✅ NEW: Firebase authentication listener
   // Find this section in your App.jsx and replace it:
 
-// ✅ NEW: Firebase authentication listener
+// ✅ Enhanced Firebase authentication listener with queue processing
 useEffect(() => {
   const unsubscribe = onAuthStateChanged(auth, 
     async (user) => {
@@ -63,6 +65,23 @@ useEffect(() => {
           
           setUser(user);
           setAuthError(null);
+          
+          // 🔑 NEW: Process notification queue when user logs in
+          if (navigator.onLine) {
+            console.log('🔄 User logged in and online - processing notification queue...');
+            const queueStats = getQueueStats();
+            
+            if (queueStats.total > 0) {
+              console.log(`📊 Found ${queueStats.total} queued notifications to process`);
+              const result = await processNotificationQueue();
+              
+              if (result.success && result.processed > 0) {
+                console.log(`✅ Successfully processed ${result.processed} queued notifications!`);
+                // You could show a toast notification here to inform the user
+              }
+            }
+          }
+          
         } catch (error) {
           console.error('Error initializing user profile:', error);
           setAuthError('Failed to initialize user profile');
@@ -82,6 +101,54 @@ useEffect(() => {
 
   return () => unsubscribe();
 }, []);
+
+// 🔑 NEW: Add online/offline event listeners
+useEffect(() => {
+  const handleOnline = async () => {
+    console.log('📶 Back online! Processing notification queue...');
+    
+    // Only process if user is logged in
+    if (user) {
+      const queueStats = getQueueStats();
+      
+      if (queueStats.total > 0) {
+        console.log(`📊 Found ${queueStats.total} queued notifications to process`);
+        
+        try {
+          const result = await processNotificationQueue();
+          
+          if (result.success && result.processed > 0) {
+            console.log(`✅ Successfully processed ${result.processed} queued notifications!`);
+            // Optional: Show success message to user
+          } else if (result.failed > 0) {
+            console.warn(`⚠️ ${result.failed} notifications failed to process`);
+          }
+        } catch (error) {
+          console.error('❌ Error processing notification queue:', error);
+        }
+      }
+    }
+  };
+
+  const handleOffline = () => {
+    console.log('📴 Gone offline - notifications will be queued until reconnected');
+  };
+
+  // Add event listeners
+  window.addEventListener('online', handleOnline);
+  window.addEventListener('offline', handleOffline);
+
+  // Process queue immediately if already online and user is logged in
+  if (navigator.onLine && user) {
+    handleOnline();
+  }
+
+  // Cleanup
+  return () => {
+    window.removeEventListener('online', handleOnline);
+    window.removeEventListener('offline', handleOffline);
+  };
+}, [user]); // Re-run when user changes
   // Onboarding form
   const [onboardingForm, setOnboardingForm] = useState({ fullName: '', birthday: '' });
   const handleCompleteOnboarding = () => {
