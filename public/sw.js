@@ -3,9 +3,6 @@ const CACHE_NAME = 'celefy-v1';
 const urlsToCache = [
   '/',
   '/index.html',
-  '/src/main.jsx',
-  '/src/App.jsx',
-  '/src/index.css',
   '/manifest.webmanifest',
   '/icons/icon-192.png',
   '/icons/icon-512.png'
