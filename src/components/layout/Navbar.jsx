@@ -1,119 +1,102 @@
-import React from 'react';
-import { Gift, Home, Star, BookOpen, LogOut, Sun, Moon } from 'lucide-react';
-import Button from '@/components/ui/Button';
+import React, { useState } from 'react';
+import { Menu, X, Sun, Moon, User, LogOut } from 'lucide-react';
+import NotificationBell from '@/components/ui/NotificationBell';
+import NotificationCenter from '@/components/ui/NotificationCenter';
 
+const Navbar = () => {
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isNotificationCenterOpen, setIsNotificationCenterOpen] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(false);
 
-const Navbar = ({ user, currentPage, setCurrentPage, darkMode, setDarkMode, handleSignOut }) => {
+  const toggleTheme = () => {
+    setIsDarkMode(!isDarkMode);
+  };
+
+  const openNotificationCenter = () => {
+    setIsNotificationCenterOpen(true);
+  };
+
+  const closeNotificationCenter = () => {
+    setIsNotificationCenterOpen(false);
+  };
+
   return (
-    <nav className="bg-white/80 backdrop-blur-md border-b border-pink-200 px-4 py-4 sticky top-0 z-40">
-      <div className="max-w-7xl mx-auto flex items-center justify-between">
-        <div className="flex items-center space-x-8">
-          <div className="flex items-center">
-            <div className="bg-gradient-to-r from-pink-500 to-purple-600 p-3 rounded-2xl mr-3 shadow-lg">
-              <Gift className="w-7 h-7 text-white" />
+    <>
+      <nav className="bg-white dark:bg-gray-900 shadow-lg border-b border-gray-200 dark:border-gray-800">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            {/* Logo */}
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <h1 className="text-2xl font-bold bg-gradient-to-r from-pink-500 to-purple-600 bg-clip-text text-transparent">
+                  🎂 Celefy
+                </h1>
+              </div>
             </div>
-            <h1 className="text-2xl font-bold bg-gradient-to-r from-pink-500 to-purple-600 bg-clip-text text-transparent">
-              Celefy
-            </h1>
-          </div>
 
-          <div className="hidden md:flex space-x-2">
-            <button
-              onClick={() => setCurrentPage('dashboard')}
-              className={`flex items-center px-4 py-2 rounded-xl text-sm font-medium transition-all duration-300 ${
-                currentPage === 'dashboard'
-                  ? 'bg-gradient-to-r from-pink-500 to-purple-500 text-white shadow-lg'
-                  : 'text-gray-600 hover:text-pink-600 hover:bg-pink-50'
-              }`}
-            >
-              <Home className="w-4 h-4 mr-2" />
-              Dashboard
-            </button>
-            <button
-              onClick={() => setCurrentPage('celebrities')}
-              className={`flex items-center px-4 py-2 rounded-xl text-sm font-medium transition-all duration-300 ${
-                currentPage === 'celebrities'
-                  ? 'bg-gradient-to-r from-pink-500 to-purple-500 text-white shadow-lg'
-                  : 'text-gray-600 hover:text-pink-600 hover:bg-pink-50'
-              }`}
-            >
-              <Star className="w-4 h-4 mr-2" />
-              Celebrities
-            </button>
-            <button
-              onClick={() => setCurrentPage('stories')}
-              className={`flex items-center px-4 py-2 rounded-xl text-sm font-medium transition-all duration-300 ${
-                currentPage === 'stories'
-                  ? 'bg-gradient-to-r from-pink-500 to-purple-500 text-white shadow-lg'
-                  : 'text-gray-600 hover:text-pink-600 hover:bg-pink-50'
-              }`}
-            >
-              <BookOpen className="w-4 h-4 mr-2" />
-              Stories
-            </button>
+            {/* Desktop Navigation */}
+            <div className="flex items-center space-x-4">
+              {/* Theme Toggle */}
+              <button
+                onClick={toggleTheme}
+                className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                aria-label="Toggle theme"
+              >
+                {isDarkMode ? (
+                  <Sun className="w-5 h-5 text-yellow-500" />
+                ) : (
+                  <Moon className="w-5 h-5 text-gray-600" />
+                )}
+              </button>
+
+              {/* 🎯 NEW: Notification Bell */}
+              <div className="relative z-10 bg-blue-100 dark:bg-blue-900 p-1 rounded">
+                <button 
+                  onClick={openNotificationCenter}
+                  className="p-2 rounded-full bg-red-500 text-white hover:bg-red-600 transition-colors"
+                  aria-label="Test Notifications"
+                >
+                  🔔 TEST
+                </button>
+              </div>
+
+              {/* User Menu */}
+              <div className="flex items-center space-x-3">
+                <div className="text-sm text-gray-700 dark:text-gray-300">
+                  Test User
+                </div>
+                <button
+                  className="flex items-center space-x-2 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                >
+                  <LogOut className="w-4 h-4" />
+                  <span>Logout</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Mobile menu button */}
+            <div className="md:hidden">
+              <button
+                onClick={() => setIsMenuOpen(!isMenuOpen)}
+                className="p-2 rounded-md text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              >
+                {isMenuOpen ? (
+                  <X className="w-6 h-6" />
+                ) : (
+                  <Menu className="w-6 h-6" />
+                )}
+              </button>
+            </div>
           </div>
         </div>
+      </nav>
 
-        <div className="flex items-center space-x-4">
-          <button
-            onClick={() => setDarkMode(!darkMode)}
-            className="p-3 text-gray-400 hover:text-pink-500 rounded-xl hover:bg-pink-50 transition-colors"
-          >
-            {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-          </button>
-
-          <div className="flex items-center space-x-3">
-            <div className="bg-gradient-to-r from-pink-500 to-purple-600 w-10 h-10 rounded-full flex items-center justify-center shadow-lg">
-              <span className="text-white text-sm font-bold">
-                {user?.displayName?.charAt(0) || 'F'}
-              </span>
-            </div>
-            <span className="hidden md:block text-sm font-medium text-gray-700">
-              {user?.displayName || 'Fahad Rehman'}
-            </span>
-            <Button variant="ghost" size="sm" onClick={handleSignOut}>
-              <LogOut className="w-4 h-4" />
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      <div className="md:hidden mt-4 flex space-x-2 overflow-x-auto pb-2">
-        <button
-          onClick={() => setCurrentPage('dashboard')}
-          className={`flex items-center px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all duration-300 ${
-            currentPage === 'dashboard'
-              ? 'bg-gradient-to-r from-pink-500 to-purple-500 text-white shadow-lg'
-              : 'text-gray-600 bg-white border border-pink-200'
-          }`}
-        >
-          <Home className="w-4 h-4 mr-2" />
-          Dashboard
-        </button>
-        <button
-          onClick={() => setCurrentPage('celebrities')}
-          className={`flex items-center px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all duration-300 ${
-            currentPage === 'celebrities'
-              ? 'bg-gradient-to-r from-pink-500 to-purple-500 text-white shadow-lg'
-              : 'text-gray-600 bg-white border border-pink-200'
-          }`}
-        >
-          <Star className="w-4 h-4 mr-2" />
-          Celebrities
-        </button>
-        <button
-          onClick={() => setCurrentPage('stories')}
-          className={`flex items-center px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all duration-300 ${
-            currentPage === 'stories'
-              ? 'bg-gradient-to-r from-pink-500 to-purple-500 text-white shadow-lg'
-              : 'text-gray-600 bg-white border border-pink-200'
-          }`}
-        >
-          <BookOpen className="w-4 h-4 mr-2" />
-          Stories
-        </button>
-      </div>
-    </nav>
+      {/* 🎯 NEW: Notification Center Modal */}
+      <NotificationCenter 
+        isOpen={isNotificationCenterOpen}
+        onClose={closeNotificationCenter}
+      />
+    </>
   );
 };
 

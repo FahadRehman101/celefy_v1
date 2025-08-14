@@ -1,384 +1,230 @@
 // 🔧 FIXED OneSignal Tester for v16 API
 import React, { useState, useEffect } from 'react';
-import { Bell, CheckCircle, XCircle, AlertCircle, Loader2 } from 'lucide-react';
+import { Bell, CheckCircle, AlertCircle, RefreshCw, TestTube } from 'lucide-react';
+import { getOneSignalStatus, requestNotificationPermission } from '@/config/onesignal';
+import { testNotificationSystem, testOneSignalRestAPI } from '@/services/notificationScheduler';
 
 const OneSignalTester = () => {
-  const [status, setStatus] = useState({
-    sdkLoaded: false,
-    userSubscribed: false,
-    userId: null,
-    permission: 'default',
-    testResult: null
-  });
-  
+  const [status, setStatus] = useState(null);
+  const [testResults, setTestResults] = useState(null);
   const [testing, setTesting] = useState(false);
-  const [subscribing, setSubscribing] = useState(false);
+  const [environment, setEnvironment] = useState('unknown');
 
-  // Check OneSignal status using v16 API
   useEffect(() => {
-    const checkStatus = async () => {
-        console.log('🔍 Checking OneSignal status...');
-        
-        const newStatus = {
-          sdkLoaded: typeof window.OneSignal !== 'undefined',
-          userSubscribed: false,
-          userId: null,
-          permission: Notification.permission,
-          testResult: null
-        };
-      
-        if (window.OneSignal) {
-          try {
-            // 🔧 IMPROVED: Multiple methods to detect subscription status
-            window.OneSignal.push(async function() {
-              try {
-                console.log('🔍 Checking subscription with v16 API...');
-                
-                // Method 1: Try v16 API
-                const subscriptionOptedIn = await window.OneSignal.User?.PushSubscription?.optedIn;
-                const subscriptionId = await window.OneSignal.User?.PushSubscription?.id;
-                
-                console.log('v16 API Results:', { 
-                  optedIn: subscriptionOptedIn, 
-                  id: subscriptionId 
-                });
-                
-                if (subscriptionOptedIn !== undefined) {
-                  newStatus.userSubscribed = subscriptionOptedIn;
-                  newStatus.userId = subscriptionId;
-                } else {
-                  // Method 2: Try legacy API
-                  console.log('🔍 Trying legacy API...');
-                  const legacyEnabled = await window.OneSignal.isPushNotificationsEnabled?.();
-                  const legacyUserId = await window.OneSignal.getUserId?.();
-                  
-                  console.log('Legacy API Results:', { 
-                    enabled: legacyEnabled, 
-                    userId: legacyUserId 
-                  });
-                  
-                  newStatus.userSubscribed = legacyEnabled || false;
-                  newStatus.userId = legacyUserId;
-                }
-                
-                // Method 3: Fallback - check browser permission
-                if (!newStatus.userSubscribed && Notification.permission === 'granted') {
-                  console.log('🔍 Using browser permission as fallback...');
-                  newStatus.userSubscribed = true;
-                  // Try to get userId from different methods
-                  try {
-                    const userId = await window.OneSignal.getUserId?.() || 
-                                 await window.OneSignal.User?.PushSubscription?.id;
-                    newStatus.userId = userId;
-                  } catch (e) {
-                    console.log('Could not get user ID:', e);
-                  }
-                }
-                
-                console.log('Final OneSignal Status:', newStatus);
-              } catch (apiError) {
-                console.error('OneSignal API error:', apiError);
-                
-                // Last resort: just check browser permission
-                if (Notification.permission === 'granted') {
-                  newStatus.userSubscribed = true;
-                  console.log('Using browser permission as final fallback');
-                }
-              }
-            });
-          } catch (error) {
-            console.error('Error in OneSignal.push:', error);
-          }
-        }
-        
-        setStatus(newStatus);
-      };
-
-      checkStatus();
+    // Determine environment
+    const hostname = window.location.hostname;
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      setEnvironment('localhost');
+    } else if (hostname.includes('netlify.app')) {
+      setEnvironment('production');
+    } else {
+      setEnvironment('development');
+    }
+    
+    updateStatus();
   }, []);
 
-  // Subscribe to notifications using v16 API
-  const handleSubscribe = async () => {
-    if (!window.OneSignal) {
-      alert('OneSignal not loaded!');
-      return;
-    }
+  const updateStatus = async () => {
+    const currentStatus = await getOneSignalStatus();
+    setStatus(currentStatus);
+  };
 
+  const handleSubscribe = async () => {
     try {
-      setSubscribing(true);
-      console.log('🔔 Requesting notification permission using v16 API...');
-      
-      window.OneSignal.push(async function() {
-        try {
-          // 🔧 FIXED: Use v16 API for permission request
-          await window.OneSignal.Slidedown.promptPush();
-          
-          // Wait a moment for permission to be processed
-          await new Promise(resolve => setTimeout(resolve, 2000));
-          
-          // Check status using v16 API
-          const isSubscribed = await window.OneSignal.User.PushSubscription.optedIn;
-          const userId = await window.OneSignal.User.PushSubscription.id;
-          
-          setStatus(prev => ({
-            ...prev,
-            userSubscribed: isSubscribed,
-            userId: userId,
-            permission: Notification.permission
-          }));
-          
-          if (isSubscribed) {
-            console.log('✅ Successfully subscribed to notifications!');
-            console.log('OneSignal Player ID:', userId);
-            alert('✅ Successfully subscribed to notifications!');
-          } else {
-            console.log('❌ Subscription failed or was denied');
-            alert('❌ Subscription failed or was denied');
-          }
-        } catch (v16Error) {
-          console.error('v16 API error, trying fallback:', v16Error);
-          
-          // Fallback to older API
-          try {
-            await window.OneSignal.showSlidedownPrompt?.();
-            
-            await new Promise(resolve => setTimeout(resolve, 2000));
-            
-            const isSubscribed = await window.OneSignal.isPushNotificationsEnabled?.();
-            const userId = await window.OneSignal.getUserId?.();
-            
-            setStatus(prev => ({
-              ...prev,
-              userSubscribed: isSubscribed || false,
-              userId: userId,
-              permission: Notification.permission
-            }));
-            
-            if (isSubscribed) {
-              console.log('✅ Successfully subscribed (fallback)!');
-              alert('✅ Successfully subscribed to notifications!');
-            } else {
-              alert('❌ Subscription failed or was denied');
-            }
-          } catch (fallbackError) {
-            console.error('Fallback subscription error:', fallbackError);
-            alert(`❌ Subscription error: ${fallbackError.message}`);
-          }
-        }
-      });
-      
+      await requestNotificationPermission();
+      await updateStatus();
     } catch (error) {
-      console.error('❌ Subscription error:', error);
-      alert(`❌ Subscription error: ${error.message}`);
-    } finally {
-      setSubscribing(false);
+      console.error('Subscription failed:', error);
     }
   };
 
-  // Test notification scheduling
-  const testNotificationScheduling = async () => {
-    if (!status.userSubscribed) {
-      alert('Please subscribe to notifications first!');
-      return;
-    }
-
-    if (!status.userId) {
-      alert('No OneSignal User ID available. Please try subscribing again.');
-      return;
-    }
-
+  const handleTestScheduling = async () => {
     setTesting(true);
+    setTestResults(null);
     
     try {
-      console.log('🧪 Testing notification scheduling...');
-      console.log('Using OneSignal User ID:', status.userId);
+      console.log('🧪 Testing notification scheduling system...');
       
-      // Import your scheduler function
-      const { scheduleBirthdayReminders } = await import('@/services/notificationScheduler');
+      // Test the basic notification system
+      const basicTest = await testNotificationSystem();
+      console.log('📱 Basic notification test result:', basicTest);
       
-      // Create a test birthday (tomorrow for quick testing)
-      const testDate = new Date();
-      testDate.setDate(testDate.getDate() + 1);
+      // Test the OneSignal REST API
+      const restApiTest = await testOneSignalRestAPI();
+      console.log('📡 OneSignal REST API test result:', restApiTest);
       
-      const testBirthday = {
-        id: 'test-' + Date.now(),
-        name: 'Test Person',
-        date: testDate.toISOString().split('T')[0] // Format: YYYY-MM-DD
-      };
-      
-      console.log('Test birthday:', testBirthday);
-      
-      // Get current user ID from Firebase
-      const { auth } = await import('@/config/firebase');
-      const currentUser = auth.currentUser;
-      
-      if (!currentUser) {
-        throw new Error('User not authenticated');
-      }
-      
-      console.log('Firebase User ID:', currentUser.uid);
-      console.log('OneSignal Player ID:', status.userId);
-      
-      const result = await scheduleBirthdayReminders(testBirthday, currentUser.uid);
-      
-      console.log('Scheduling result:', result);
-      
-      setStatus(prev => ({
-        ...prev,
-        testResult: result
-      }));
-      
-      if (result.success) {
-        alert(`✅ Test successful! Scheduled ${result.scheduledCount || 0} notifications. Check console for notification IDs.`);
-      } else {
-        alert(`❌ Test failed: ${result.error}`);
-      }
+      setTestResults({
+        basic: basicTest,
+        restApi: restApiTest,
+        timestamp: new Date().toLocaleString()
+      });
       
     } catch (error) {
-      console.error('❌ Test error:', error);
-      alert(`❌ Test error: ${error.message}`);
-      setStatus(prev => ({
-        ...prev,
-        testResult: { success: false, error: error.message }
-      }));
+      console.error('❌ Testing failed:', error);
+      setTestResults({
+        error: error.message,
+        timestamp: new Date().toLocaleString()
+      });
     } finally {
       setTesting(false);
     }
   };
 
+  if (!status) {
+    return (
+      <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
+        <div className="flex items-center space-x-2">
+          <RefreshCw className="w-4 h-4 animate-spin text-gray-500" />
+          <span className="text-gray-500">Loading OneSignal status...</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-4">
-      <div className="flex items-center space-x-2 mb-4">
-        <Bell className="w-5 h-5 text-blue-600" />
-        <h4 className="text-lg font-semibold text-gray-900">
-          OneSignal Status
-        </h4>
-        <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
-          SDK v16
-        </span>
+    <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 p-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center space-x-2">
+          <Bell className="w-5 h-5" />
+          <span>OneSignal Status & Testing</span>
+        </h3>
+        <button
+          onClick={updateStatus}
+          className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+        >
+          <RefreshCw className="w-4 h-4" />
+        </button>
       </div>
 
-      {/* Status Grid */}
-      <div className="grid grid-cols-2 gap-3">
-        <div className="p-3 bg-gray-50 rounded-lg">
+      {/* Environment Warning */}
+      {environment === 'localhost' && (
+        <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3">
           <div className="flex items-center space-x-2">
-            {status.sdkLoaded ? (
-              <CheckCircle className="w-4 h-4 text-green-600" />
-            ) : (
-              <XCircle className="w-4 h-4 text-red-600" />
-            )}
-            <span className="text-sm font-medium">SDK Loaded</span>
-          </div>
-        </div>
-
-        <div className="p-3 bg-gray-50 rounded-lg">
-          <div className="flex items-center space-x-2">
-            {status.userSubscribed ? (
-              <CheckCircle className="w-4 h-4 text-green-600" />
-            ) : (
-              <XCircle className="w-4 h-4 text-red-600" />
-            )}
-            <span className="text-sm font-medium">Subscribed</span>
-          </div>
-        </div>
-
-        <div className="p-3 bg-gray-50 rounded-lg col-span-2">
-          <div className="flex items-center space-x-2">
-            <AlertCircle className="w-4 h-4 text-blue-600" />
-            <span className="text-sm font-medium">Permission: {status.permission}</span>
-          </div>
-        </div>
-
-        {status.userId && (
-          <div className="p-3 bg-gray-50 rounded-lg col-span-2">
-            <div className="flex items-center space-x-2">
-              <CheckCircle className="w-4 h-4 text-green-600" />
-              <span className="text-xs font-mono text-gray-600 break-all">
-                Player ID: {status.userId}
-              </span>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Action Buttons */}
-      <div className="space-y-2">
-        {!status.userSubscribed && (
-          <button
-            onClick={handleSubscribe}
-            disabled={subscribing || !status.sdkLoaded}
-            className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white py-2 px-4 rounded-lg font-medium transition-colors flex items-center justify-center"
-          >
-            {subscribing ? (
-              <div className="flex items-center space-x-2">
-                <Loader2 className="w-4 h-4 animate-spin" />
-                <span>Subscribing...</span>
-              </div>
-            ) : (
-              'Subscribe to Notifications'
-            )}
-          </button>
-        )}
-
-        {status.userSubscribed && status.userId && (
-          <button
-            onClick={testNotificationScheduling}
-            disabled={testing}
-            className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white py-2 px-4 rounded-lg font-medium transition-colors flex items-center justify-center"
-          >
-            {testing ? (
-              <div className="flex items-center space-x-2">
-                <Loader2 className="w-4 h-4 animate-spin" />
-                <span>Testing...</span>
-              </div>
-            ) : (
-              'Test Notification Scheduling'
-            )}
-          </button>
-        )}
-      </div>
-
-      {/* Test Results */}
-      {status.testResult && (
-        <div className="mt-4 p-3 bg-gray-50 rounded-lg">
-          <h5 className="text-sm font-medium mb-2">Last Test Result:</h5>
-          <div className="text-xs space-y-1">
+            <AlertCircle className="w-5 h-5 text-yellow-600 dark:text-yellow-400" />
             <div>
-              <strong>Success:</strong> {status.testResult.success ? '✅' : '❌'}
+              <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
+                Localhost Environment
+              </p>
+              <p className="text-sm text-yellow-700 dark:text-yellow-300">
+                Some OneSignal features may be limited on localhost. Test on Netlify for full functionality.
+              </p>
             </div>
-            {status.testResult.scheduledCount && (
-              <div>
-                <strong>Scheduled:</strong> {status.testResult.scheduledCount} notifications
-              </div>
-            )}
-            {status.testResult.notificationIds && status.testResult.notificationIds.length > 0 && (
-              <div>
-                <strong>IDs:</strong> {status.testResult.notificationIds.join(', ')}
-              </div>
-            )}
-            {status.testResult.error && (
-              <div className="text-red-600">
-                <strong>Error:</strong> {status.testResult.error}
-              </div>
-            )}
           </div>
         </div>
       )}
 
-      {/* Instructions */}
-      <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-        <h5 className="text-sm font-medium text-blue-800 mb-1">
-          Quick Test Steps:
-        </h5>
-        <ol className="text-xs text-blue-700 list-decimal list-inside space-y-1">
-          <li>Check that SDK is loaded ✓</li>
-          <li>Click "Subscribe to Notifications"</li>
-          <li>Allow permission when browser prompts</li>
-          <li>Verify you see a Player ID</li>
-          <li>Click "Test Notification Scheduling"</li>
-          <li>Check console for notification IDs</li>
-        </ol>
+      {/* Status Display */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-3">
+          <h4 className="font-medium text-gray-900 dark:text-white">OneSignal Status</h4>
+          <div className="space-y-2 text-sm">
+            <div className="flex justify-between">
+              <span className="text-gray-600 dark:text-gray-400">SDK Loaded:</span>
+              <span className={status.sdkLoaded ? 'text-green-600' : 'text-red-600'}>
+                {status.sdkLoaded ? '✅ Yes' : '❌ No'}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-600 dark:text-gray-400">Initialized:</span>
+              <span className={status.initialized ? 'text-green-600' : 'text-red-600'}>
+                {status.initialized ? '✅ Yes' : '❌ No'}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-600 dark:text-gray-400">User Subscribed:</span>
+              <span className={status.userSubscribed ? 'text-green-600' : 'text-red-600'}>
+                {status.userSubscribed ? '✅ Yes' : '❌ No'}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-600 dark:text-gray-400">Permission:</span>
+              <span className="text-blue-600">{status.permission}</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          <h4 className="font-medium text-gray-900 dark:text-white">Environment</h4>
+          <div className="space-y-2 text-sm">
+            <div className="flex justify-between">
+              <span className="text-gray-600 dark:text-gray-400">Environment:</span>
+              <span className="text-blue-600 capitalize">{environment}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-600 dark:text-gray-400">User ID:</span>
+              <span className="text-gray-900 dark:text-white font-mono text-xs">
+                {status.userId ? `${status.userId.substring(0, 8)}...` : 'Not set'}
+              </span>
+            </div>
+          </div>
+        </div>
       </div>
+
+      {/* Action Buttons */}
+      <div className="flex flex-wrap gap-3">
+        <button
+          onClick={handleSubscribe}
+          disabled={status.userSubscribed}
+          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-lg font-medium transition-colors disabled:cursor-not-allowed"
+        >
+          {status.userSubscribed ? 'Already Subscribed' : 'Subscribe to Notifications'}
+        </button>
+        
+        <button
+          onClick={handleTestScheduling}
+          disabled={testing}
+          className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white rounded-lg font-medium transition-colors disabled:cursor-not-allowed flex items-center space-x-2"
+        >
+          <TestTube className="w-4 h-4" />
+          <span>{testing ? 'Testing...' : 'Test Scheduling'}</span>
+        </button>
+      </div>
+
+      {/* Test Results */}
+      {testResults && (
+        <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 space-y-4">
+          <h4 className="font-medium text-gray-900 dark:text-white">Test Results</h4>
+          
+          {testResults.error ? (
+            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
+              <div className="flex items-center space-x-2">
+                <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400" />
+                <span className="text-sm text-red-700 dark:text-red-300">
+                  Test failed: {testResults.error}
+                </span>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {/* Basic Notification Test */}
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                <h5 className="font-medium text-blue-800 dark:text-blue-200 mb-2">Basic Notification Test</h5>
+                <div className="text-sm text-blue-700 dark:text-blue-300 space-y-1">
+                  <div><strong>Status:</strong> {testResults.basic.success ? '✅ Success' : '❌ Failed'}</div>
+                  <div><strong>Immediate:</strong> {testResults.basic.immediate}</div>
+                  <div><strong>Scheduled:</strong> {testResults.basic.scheduled}</div>
+                  <div><strong>Message:</strong> {testResults.basic.message}</div>
+                </div>
+              </div>
+
+              {/* OneSignal REST API Test */}
+              <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-3">
+                <h5 className="font-medium text-green-800 dark:text-green-200 mb-2">OneSignal REST API Test</h5>
+                <div className="text-sm text-green-700 dark:text-green-300 space-y-1">
+                  <div><strong>Status:</strong> {testResults.restApi.success ? '✅ Success' : '❌ Failed'}</div>
+                  <div><strong>Scheduled For:</strong> {testResults.restApi.scheduledFor}</div>
+                  <div><strong>Notification ID:</strong> {testResults.restApi.notificationId || 'Not provided'}</div>
+                  <div><strong>Message:</strong> {testResults.restApi.message}</div>
+                </div>
+              </div>
+
+              <div className="text-xs text-gray-500 text-center">
+                Test completed at: {testResults.timestamp}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };

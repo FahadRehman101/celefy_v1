@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import BirthdayList from '@/components/birthday/BirthdayList';
-import OneSignalTester from '@/components/debug/OneSignalTester';
 import {
   Gift,
   Calendar,
@@ -14,7 +13,6 @@ import {
   Cloud,
   CloudOff
 } from 'lucide-react';
-import Card from '@/components/ui/Card';
 import AddBirthdayModal from '@/components/birthday/AddBirthdayModal';
 import { calculateDaysUntilBirthday } from '@/utils/dates';
 import { getBirthdaysOptimized, syncPendingChanges } from '@/services/firestore-cached'; // Updated import
@@ -66,16 +64,6 @@ const Dashboard = ({ user }) => {
     }
   }, [birthdays, user?.uid]);
 
-  // Debug filtered birthdays
-  useEffect(() => {
-    console.log('🎂 Dashboard filtered birthdays:', {
-      count: filteredBirthdays.length,
-      filter: selectedFilter,
-      search: searchTerm,
-      birthdays: filteredBirthdays.map(b => ({ id: b.id, name: b.name, date: b.date }))
-    });
-  }, [filteredBirthdays, selectedFilter, searchTerm]);
-
   // Set up network listeners
   useEffect(() => {
     const cleanup = setupNetworkListeners(
@@ -96,7 +84,6 @@ const Dashboard = ({ user }) => {
 
     return cleanup;
   }, [user?.uid]);
-  <OneSignalTester />
 
   /**
    * Load birthdays using optimized cached service
@@ -240,6 +227,13 @@ const handleAddBirthday = (newBirthday) => {
   };
 
   /**
+   * Handle clicking on stat cards to show filtered lists
+   */
+  const handleStatCardClick = (filterType) => {
+    setSelectedFilter(filterType);
+  };
+
+  /**
    * Filter birthdays based on selected filter and search term
    */
   const filteredBirthdays = birthdays.filter((b) => {
@@ -257,12 +251,22 @@ const handleAddBirthday = (newBirthday) => {
         );
       case 'This Month':
         return bday.getMonth() === today.getMonth() && nameMatch;
-      case 'Upcoming':
+      case 'This Week':
         return daysUntil <= 7 && nameMatch;
       default:
         return nameMatch;
     }
   });
+
+  // Debug filtered birthdays - moved here after filteredBirthdays is defined
+  useEffect(() => {
+    console.log('🎂 Dashboard filtered birthdays:', {
+      count: filteredBirthdays.length,
+      filter: selectedFilter,
+      search: searchTerm,
+      birthdays: filteredBirthdays.map(b => ({ id: b.id, name: b.name, date: b.date }))
+    });
+  }, [filteredBirthdays, selectedFilter, searchTerm]);
 
   // Calculate statistics - add safety checks
   const countToday = birthdays.filter((b) => {
@@ -306,12 +310,21 @@ const handleAddBirthday = (newBirthday) => {
   if (loading) {
     return (
       <div className="space-y-8">
-        <Card variant="gradient" padding="lg">
-          <div className="flex items-center justify-center text-white py-8">
-            <Loader2 className="w-8 h-8 animate-spin mr-3" />
-            <span className="text-xl">Loading your birthdays...</span>
+        <div className="bg-gradient-to-br from-pink-50 via-purple-50 to-blue-50 dark:from-pink-900/20 dark:via-purple-900/20 dark:to-blue-900/20 rounded-2xl border border-pink-200 dark:border-pink-800 p-12 shadow-lg">
+          <div className="flex items-center justify-center text-gray-700 dark:text-gray-300">
+            <div className="w-16 h-16 bg-gradient-to-br from-pink-400 to-purple-600 rounded-2xl flex items-center justify-center mr-6 shadow-lg">
+              <Loader2 className="w-8 h-8 animate-spin text-white" />
+            </div>
+            <div>
+              <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200 mb-2">
+                Loading your celebrations... 🎉
+              </h2>
+              <p className="text-gray-600 dark:text-gray-400">
+                Preparing your birthday dashboard with love and care! 💖
+              </p>
+            </div>
           </div>
-        </Card>
+        </div>
       </div>
     );
   }
@@ -320,20 +333,26 @@ const handleAddBirthday = (newBirthday) => {
   if (error) {
     return (
       <div className="space-y-8">
-        <Card variant="gradient" padding="lg">
-          <div className="text-center text-white">
-            <AlertCircle className="w-16 h-16 mx-auto mb-4 text-red-300" />
-            <h1 className="text-2xl font-bold mb-2">Oops! Something went wrong</h1>
-            <p className="text-blue-100 mb-4">{error}</p>
+        <div className="bg-gradient-to-br from-red-50 via-pink-50 to-purple-50 dark:from-red-900/20 dark:via-pink-900/20 dark:to-purple-900/20 rounded-2xl border border-red-200 dark:border-red-800 p-12 shadow-lg">
+          <div className="text-center text-gray-800 dark:text-gray-200">
+            <div className="w-20 h-20 bg-gradient-to-br from-red-400 to-pink-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg">
+              <AlertCircle className="w-10 h-10 text-white" />
+            </div>
+            <h2 className="text-3xl font-bold mb-4 text-gray-900 dark:text-white">
+              Oops! Something went wrong 😅
+            </h2>
+            <p className="text-gray-600 dark:text-gray-400 mb-6 text-lg">
+              {error}
+            </p>
             <button
               onClick={() => loadBirthdaysOptimized()}
-              className="bg-white/20 hover:bg-white/30 px-6 py-2 rounded-lg transition-colors flex items-center mx-auto"
+              className="bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white px-8 py-3 rounded-xl font-semibold transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 flex items-center mx-auto"
             >
-              <RefreshCw className="w-4 h-4 mr-2" />
+              <RefreshCw className="w-5 h-5 mr-2" />
               Try Again
             </button>
           </div>
-        </Card>
+        </div>
       </div>
     );
   }
@@ -341,209 +360,190 @@ const handleAddBirthday = (newBirthday) => {
   return (
     <ErrorBoundary>
       <div className="space-y-8">
-        {/* Welcome Header with Status Indicators */}
-        <Card variant="gradient" padding="lg">
-          <div className="flex items-start justify-between text-white">
-            <div>
-              <h1 className="text-3xl font-bold mb-2">
-                Welcome back, {user?.displayName?.split(' ')[0] || 'Friend'}! 🎉
-              </h1>
-              <p className="text-blue-100 text-lg mb-4">
-                {birthdays.length === 0 
-                  ? "Ready to add your first birthday?" 
-                  : `You're tracking ${birthdays.length} birthdays`}
-              </p>
-              
-              {/* Status indicators */}
-              <div className="flex items-center space-x-4 mb-4">
-                {/* Network Status */}
-                <div className="flex items-center space-x-2">
-                  {isOnline ? (
-                    <Wifi className="w-4 h-4 text-green-300" />
-                  ) : (
-                    <WifiOff className="w-4 h-4 text-red-300" />
-                  )}
-                  <span className="text-sm text-blue-100">
-                    {isOnline ? 'Online' : 'Offline'}
-                  </span>
-                </div>
-
-                {/* Sync Status */}
-                <div className="flex items-center space-x-2">
-                  <SyncIcon className={`w-4 h-4 ${syncInfo.color} ${syncInfo.spin ? 'animate-spin' : ''}`} />
-                  <span className="text-sm text-blue-100">{syncInfo.text}</span>
-                </div>
-
-                {/* Data Source */}
-                <div className="text-sm text-blue-200">
-                  Data: {dataSource === 'cache' ? '⚡ Cached' : '☁️ Live'}
-                </div>
-
-                {/* Pending Changes */}
-                {pendingChanges > 0 && (
-                  <div className="text-sm text-yellow-200">
-                    {pendingChanges} pending change{pendingChanges !== 1 ? 's' : ''}
-                  </div>
-                )}
-                
-                {/* CRITICAL DEBUG: Manual cache check button */}
-                <button
-                  onClick={() => {
-                    if (user?.uid) {
-                      try {
-                        const cached = getCachedBirthdays(user.uid);
-                        console.log('🔍 MANUAL CACHE CHECK:', {
-                          count: cached.data.length,
-                          data: cached.data.map(b => ({ id: b.id, name: b.name, date: b.date }))
-                        });
-                        alert(`Cache has ${cached.data.length} birthdays. Check console for details.`);
-                      } catch (error) {
-                        console.error('❌ Manual cache check failed:', error);
-                        alert('Cache check failed. Check console for details.');
-                      }
-                    }
-                  }}
-                  className="text-sm text-blue-200 hover:text-blue-100 bg-blue-500/20 px-2 py-1 rounded"
-                >
-                  🔍 Check Cache
-                </button>
+        {/* Enhanced Header with notification status */}
+        <div className="mb-6 md:mb-8">
+          <div className="flex flex-col md:flex-row gap-4 md:gap-6 mb-4 md:mb-6">
+            <div className="flex items-center space-x-3 md:space-x-4">
+              <div className="w-12 h-12 md:w-16 md:h-16 bg-gradient-to-br from-pink-500 via-purple-500 to-blue-600 rounded-2xl flex items-center justify-center shadow-lg">
+                <span className="text-2xl md:text-3xl">🎂</span>
               </div>
-              
-              {/* Action Buttons */}
-              <div className="flex items-center space-x-2">
-                <button
-                  onClick={handleRefresh}
-                  disabled={refreshing}
-                  className="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition-colors flex items-center disabled:opacity-50"
-                >
-                  <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
-                  {refreshing ? 'Syncing...' : 'Refresh'}
-                </button>
-
-                {/* Sync Pending Changes Button */}
-                {pendingChanges > 0 && isOnline && (
-                  <button
-                    onClick={handleSyncPendingChanges}
-                    disabled={syncStatus === 'syncing'}
-                    className="bg-yellow-500/20 hover:bg-yellow-500/30 px-4 py-2 rounded-lg transition-colors flex items-center disabled:opacity-50"
-                  >
-                    <Cloud className={`w-4 h-4 mr-2 ${syncStatus === 'syncing' ? 'animate-spin' : ''}`} />
-                    Sync Changes
-                  </button>
-                )}
+              <div>
+                <h1 className="text-2xl md:text-4xl font-bold bg-gradient-to-r from-pink-600 via-purple-600 to-blue-600 bg-clip-text text-transparent">
+                  Celefy
+                </h1>
+                <p className="text-sm md:text-lg text-gray-600 dark:text-gray-400">
+                  Celebrate every special moment! 🎉
+                </p>
               </div>
-            </div>
-            
-            <div className="text-right">
-              <Gift className="w-16 h-16 mb-2 opacity-80" />
-              <div className="text-sm text-blue-100">
-                Last updated: {new Date().toLocaleTimeString()}
-              </div>
-            </div>
-          </div>
-        </Card>
-
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Card className="text-center p-6 hover:shadow-lg transition-shadow">
-            <Calendar className="w-12 h-12 mx-auto mb-3 text-blue-500" />
-            <div className="text-2xl font-bold text-gray-800">{countToday}</div>
-            <div className="text-gray-600">Today</div>
-          </Card>
-          
-          <Card className="text-center p-6 hover:shadow-lg transition-shadow">
-            <TrendingUp className="w-12 h-12 mx-auto mb-3 text-green-500" />
-            <div className="text-2xl font-bold text-gray-800">{countMonth}</div>
-            <div className="text-gray-600">This Month</div>
-          </Card>
-          
-          <Card className="text-center p-6 hover:shadow-lg transition-shadow">
-            <Gift className="w-12 h-12 mx-auto mb-3 text-purple-500" />
-            <div className="text-2xl font-bold text-gray-800">{countUpcoming}</div>
-            <div className="text-gray-600">Coming Soon</div>
-          </Card>
-        </div>
-
-        {/* Search and Filter Section */}
-        <Card className="p-6">
-          <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
-            <div className="relative flex-1 max-w-md">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-              <input
-                type="text"
-                placeholder="Search birthdays..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-              />
-            </div>
-            
-            <div className="flex gap-2">
-              {['All', 'Today', 'This Month', 'Upcoming'].map((filter) => (
-                <button
-                  key={filter}
-                  onClick={() => setSelectedFilter(filter)}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    selectedFilter === filter
-                      ? 'bg-purple-500 text-white'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}
-                >
-                  {filter}
-                </button>
-              ))}
             </div>
             
             <button
               onClick={() => setShowModal(true)}
-              className="bg-gradient-to-r from-pink-500 to-purple-500 text-white px-6 py-2 rounded-lg hover:shadow-lg transition-all flex items-center"
+              className="bg-gradient-to-r from-pink-500 via-purple-500 to-blue-600 hover:from-pink-600 hover:via-purple-600 hover:to-blue-700 text-white px-6 md:px-8 py-3 md:py-4 rounded-2xl font-bold text-base md:text-lg transition-all duration-300 shadow-xl hover:shadow-2xl transform hover:scale-105 flex items-center justify-center space-x-2 md:space-x-3 border-2 border-white/20 w-full md:w-auto"
             >
-              <Gift className="w-4 h-4 mr-2" />
-              Add Birthday
+              <span className="text-xl md:text-2xl">🎁</span>
+              <span>Add Birthday</span>
+              <span className="text-lg md:text-xl">✨</span>
             </button>
           </div>
-        </Card>
+          
+          {/* Simplified Stats - Only 4 Essential Sections */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 mb-8">
+            <div 
+              onClick={() => handleStatCardClick('All')}
+              className="bg-gradient-to-br from-pink-50 to-purple-50 dark:from-pink-900/20 dark:to-purple-900/20 rounded-2xl border border-pink-200 dark:border-pink-700 p-4 md:p-6 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 cursor-pointer group min-h-[140px] md:min-h-[180px] flex flex-col justify-center"
+            >
+              <div className="text-center">
+                <div className="w-12 h-12 md:w-16 md:h-16 bg-gradient-to-br from-pink-400 to-pink-600 rounded-2xl flex items-center justify-center mx-auto mb-3 md:mb-4 shadow-lg group-hover:shadow-2xl transition-all duration-300">
+                  <span className="text-2xl md:text-3xl">🎂</span>
+                </div>
+                <div className="text-2xl md:text-3xl font-bold text-pink-600 mb-2">
+                  {birthdays.length}
+                </div>
+                <div className="text-xs md:text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Total Birthdays
+                </div>
+                <div className="text-xs text-pink-500 mt-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-300">
+                  Tap to view all
+                </div>
+              </div>
+            </div>
+            
+            <div 
+              onClick={() => handleStatCardClick('Today')}
+              className="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-2xl border border-green-200 dark:border-green-700 p-4 md:p-6 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 cursor-pointer group min-h-[140px] md:min-h-[180px] flex flex-col justify-center"
+            >
+              <div className="text-center">
+                <div className="w-12 h-12 md:w-16 md:h-16 bg-gradient-to-br from-green-400 to-green-600 rounded-2xl flex items-center justify-center mx-auto mb-3 md:mb-4 shadow-lg group-hover:shadow-2xl transition-all duration-300">
+                  <span className="text-2xl md:text-3xl">📅</span>
+                </div>
+                <div className="text-2xl md:text-3xl font-bold text-green-600 mb-2">
+                  {countToday}
+                </div>
+                <div className="text-xs md:text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Today
+                </div>
+                <div className="text-xs text-green-500 mt-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-300">
+                  Tap to view today's
+                </div>
+              </div>
+            </div>
+            
+            <div 
+              onClick={() => handleStatCardClick('This Month')}
+              className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-2xl border border-blue-200 dark:border-blue-700 p-4 md:p-6 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 cursor-pointer group min-h-[140px] md:min-h-[180px] flex flex-col justify-center"
+            >
+              <div className="text-center">
+                <div className="w-12 h-12 md:w-16 md:h-16 bg-gradient-to-br from-blue-400 to-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-3 md:mb-4 shadow-lg group-hover:shadow-2xl transition-all duration-300">
+                  <span className="text-2xl md:text-3xl">📈</span>
+                </div>
+                <div className="text-2xl md:text-3xl font-bold text-blue-600 mb-2">
+                  {countMonth}
+                </div>
+                <div className="text-xs md:text-sm font-medium text-gray-700 dark:text-gray-300">
+                  This Month
+                </div>
+                <div className="text-xs text-blue-500 mt-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-300">
+                  Tap to view month's
+                </div>
+              </div>
+            </div>
+            
+            <div 
+              onClick={() => handleStatCardClick('This Week')}
+              className="bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 rounded-2xl border border-purple-200 dark:border-purple-700 p-4 md:p-6 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 cursor-pointer group min-h-[140px] md:min-h-[180px] flex flex-col justify-center"
+            >
+              <div className="text-center">
+                <div className="w-12 h-12 md:w-16 md:h-16 bg-gradient-to-br from-purple-400 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-3 md:mb-4 shadow-lg group-hover:shadow-2xl transition-all duration-300">
+                  <span className="text-2xl md:text-3xl">🎁</span>
+                </div>
+                <div className="text-2xl md:text-3xl font-bold text-purple-600 mb-2">
+                  {countUpcoming}
+                </div>
+                <div className="text-xs md:text-sm font-medium text-gray-700 dark:text-gray-300">
+                  This Week
+                </div>
+                <div className="text-xs text-purple-500 mt-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-300">
+                  Tap to view week's
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        {/* Interactive Birthday List Section */}
+        <div className="space-y-4 md:space-y-6">
+            {/* Header with search - Mobile optimized */}
+            <div className="flex flex-col md:flex-row gap-4 md:gap-6 items-start md:items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <h2 className="text-xl md:text-2xl font-bold bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent">
+                  {selectedFilter === 'All' && 'All Birthdays'}
+                  {selectedFilter === 'Today' && 'Today\'s Birthdays'}
+                  {selectedFilter === 'This Month' && 'This Month\'s Birthdays'}
+                  {selectedFilter === 'This Week' && 'This Week\'s Birthdays'}
+                </h2>
+              </div>
+              
+              {/* Search bar - Full width on mobile */}
+              <div className="relative w-full md:max-w-md">
+                <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-pink-400 w-5 h-5" />
+                <input
+                  type="text"
+                  placeholder="🔍 Search birthdays by name..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-12 pr-4 py-3 md:py-3 border-2 border-pink-200 dark:border-pink-700 rounded-xl focus:ring-2 focus:ring-pink-500 focus:border-pink-500 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 transition-all duration-200 text-base"
+                />
+              </div>
+            </div>
 
-        {/* Birthday List */}
-        <BirthdayList 
-          birthdays={filteredBirthdays}
-          onRefresh={handleRefresh}
-          loading={refreshing}
-          userId={user?.uid}
-          onDataChange={() => {
-            checkPendingChanges();
-            // Small delay to let cache update
-            setTimeout(() => loadBirthdaysOptimized(), 100);
-          }}
-        />
+            {/* Birthday List or Empty State */}
+            {filteredBirthdays.length > 0 ? (
+              <BirthdayList 
+                birthdays={filteredBirthdays}
+                onRefresh={handleRefresh}
+                loading={refreshing}
+                userId={user?.uid}
+                onDataChange={() => {
+                  checkPendingChanges();
+                  setTimeout(() => loadBirthdaysOptimized(), 100);
+                }}
+              />
+            ) : (
+              <div className="bg-gradient-to-br from-gray-50 via-pink-50 to-purple-50 dark:from-gray-900/20 dark:via-pink-900/10 dark:to-purple-900/10 rounded-2xl border border-gray-200 dark:border-gray-700 p-8 md:p-16 text-center shadow-lg">
+                <div className="w-20 h-20 md:w-24 md:h-24 bg-gradient-to-br from-gray-300 to-gray-400 dark:from-gray-600 to-gray-700 rounded-full flex items-center justify-center mx-auto mb-4 md:mb-6 shadow-lg">
+                  <span className="text-3xl md:text-4xl">🎂</span>
+                </div>
+                <h3 className="text-xl md:text-2xl font-bold text-gray-800 dark:text-gray-200 mb-3 md:mb-4">
+                  {selectedFilter === 'All' && 'No Birthdays Yet'}
+                  {selectedFilter === 'Today' && 'No Birthdays Today'}
+                  {selectedFilter === 'This Month' && 'No Birthdays This Month'}
+                  {selectedFilter === 'This Week' && 'No Birthdays This Week'}
+                </h3>
+                <p className="text-sm md:text-lg text-gray-600 dark:text-gray-400 mb-6 md:mb-8 max-w-md mx-auto">
+                  {selectedFilter === 'All' && 'Start celebrating by adding your first birthday! 🎉'}
+                  {selectedFilter === 'Today' && 'No one has a birthday today, but you can still celebrate! 🎊'}
+                  {selectedFilter === 'This Month' && 'This month is quiet, but next month might be exciting! 🌟'}
+                  {selectedFilter === 'This Week' && 'This week is calm, but celebrations are coming soon! ✨'}
+                </p>
+                <button
+                  onClick={() => setShowModal(true)}
+                  className="bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white px-6 md:px-8 py-3 md:py-4 rounded-2xl font-semibold transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 flex items-center justify-center space-x-2 md:space-x-3 mx-auto text-sm md:text-base"
+                >
+                  <span className="text-lg md:text-xl">🎁</span>
+                  <span>Add Birthday</span>
+                  <span className="text-base md:text-lg">✨</span>
+                </button>
+              </div>
+            )}
+          </div>
 
         {/* Add Birthday Modal */}
         <AddBirthdayModal
           isOpen={showModal}
           onClose={() => setShowModal(false)}
           onAdd={handleAddBirthday}
-         
         />
-
-
-
-
-{/* 🔧 ADD: OneSignal Debug Tester - Remove this in production */}
-{process.env.NODE_ENV === 'development' && (
-  <div className="mt-8">
-    <Card className="p-6">
-      <h3 className="text-lg font-semibold mb-4 text-gray-800">🔧 OneSignal Debug Tester</h3>
-      <OneSignalTester />
-    </Card>
-  </div>
-)}
-
-{/* Add Birthday Modal */}
-<AddBirthdayModal
-  isOpen={showModal}
-  onClose={() => setShowModal(false)}
-  onAdd={handleAddBirthday}
-/>
       </div>
     </ErrorBoundary>
   );
