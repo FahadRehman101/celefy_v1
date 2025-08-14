@@ -37,14 +37,7 @@ import {
   export const getBirthdaysOptimized = async (userId, forceSync = false) => {
     console.log('🚀 getBirthdaysOptimized called:', { userId, forceSync });
   
-    // TEMPORARY FIX: Force fresh fetch every time for debugging
-    if (userId) {
-      console.log('🧹 Clearing all cache for fresh start');
-      localStorage.removeItem(`birthdays_${userId}`);
-      localStorage.removeItem(`sync_time_${userId}`);
-      localStorage.removeItem(`sync_queue_${userId}`);
-      // Don't return cached data, always fetch fresh
-    }
+    
   
     // Emergency check for stuck items
     if (forceSync) {

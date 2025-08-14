@@ -18,6 +18,7 @@ import Stories from '@/pages/Stories';
 
 import OnboardingModal from '@/components/onboarding/OnboardingModal';
 import Navigation from '@/components/layout/Navigation';
+import PWAInstallPrompt from '@/components/PWAInstallPrompt';
 
 import {
   mockBirthdays,
@@ -264,6 +265,9 @@ const App = () => {
             />
           </ErrorBoundary>
         )}
+        
+        {/* PWA Install Prompt */}
+        <PWAInstallPrompt />
       </div>
     </ErrorBoundary>
   );

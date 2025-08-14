@@ -197,6 +197,15 @@ const AddBirthdayModal = ({ isOpen, onClose, onAdd }) => {
       // CRITICAL FIX: Success UI updates happen IMMEDIATELY after birthday save
       setSuccess(true);
       
+      // Trigger install prompt after first successful birthday add
+      if (!window.matchMedia('(display-mode: standalone)').matches) {
+        const birthdayCount = localStorage.getItem('total_birthdays_added') || '0';
+        if (birthdayCount === '0') {
+          window.dispatchEvent(new Event('show-pwa-prompt'));
+        }
+        localStorage.setItem('total_birthdays_added', String(parseInt(birthdayCount) + 1));
+      }
+      
       // CRITICAL FIX: Set a default notification status immediately and force display
       const initialStatus = 'Birthday saved successfully! 🔔 Setting up birthday reminders...';
       setNotificationStatus(initialStatus);

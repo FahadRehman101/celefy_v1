@@ -386,6 +386,7 @@ const handleAddBirthday = (newBirthday) => {
               <span className="text-lg md:text-xl">✨</span>
             </button>
             
+            {/* Emergency sync button - uncomment if needed
             <button
               onClick={async () => {
                 console.log('🔄 Force syncing with Firebase...');
@@ -397,6 +398,7 @@ const handleAddBirthday = (newBirthday) => {
             >
               Force Sync (Emergency)
             </button>
+            */}
           </div>
           
           {/* Simplified Stats - Only 4 Essential Sections */}
