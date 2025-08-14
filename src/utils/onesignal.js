@@ -1,157 +1,254 @@
-import { getOneSignalConfig, isOneSignalConfigured } from '@/config/onesignal';
+import { getOneSignalConfig, getOneSignalInitOptions, isOneSignalConfigured } from '@/config/onesignal';
 
-const waitForOneSignal = () => {
-  return new Promise((resolve, reject) => {
-    if (typeof window.OneSignal !== 'undefined') {
-      resolve(window.OneSignal);
-      return;
-    }
-
-    let attempts = 0;
-    const maxAttempts = 30; // 30 seconds
-    
-    const checkInterval = setInterval(() => {
-      attempts++;
-      
-      if (typeof window.OneSignal !== 'undefined') {
-        clearInterval(checkInterval);
-        resolve(window.OneSignal);
-      } else if (attempts >= maxAttempts) {
-        clearInterval(checkInterval);
-        reject(new Error('OneSignal not loaded after 30 seconds'));
-      }
-    }, 1000);
-  });
-};
-
-/**
- * Check if user is subscribed to notifications
- */
-export const isSubscribed = async () => {
+// CRITICAL FIX: Safe OneSignal availability check
+export const isOneSignalSafe = () => {
   try {
-    // Simple browser API check (most reliable)
-    return Notification.permission === 'granted';
+    return !!(
+      window.OneSignal && 
+      typeof window.OneSignal === 'object' &&
+      window.OneSignal.User &&
+      typeof window.OneSignal.User === 'object'
+    );
   } catch (error) {
-    console.error('Error checking subscription:', error);
+    console.warn('⚠️ OneSignal safety check failed:', error.message);
     return false;
   }
 };
 
-/**
- * Request notification permission
- */
-export const requestPermission = async () => {
+// CRITICAL FIX: Safe OneSignal method call wrapper
+export const safeOneSignalCall = async (methodName, methodCall, fallback = null) => {
   try {
-    const OneSignal = await waitForOneSignal();
-    
-    // Request permission using OneSignal
-    await OneSignal.Slidedown.promptPush();
-    
-    // Wait a moment for permission to be processed
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    return Notification.permission === 'granted';
-  } catch (error) {
-    console.error('Error requesting permission:', error);
-    
-    // Fallback to browser API
-    try {
-      const permission = await Notification.requestPermission();
-      return permission === 'granted';
-    } catch (fallbackError) {
-      console.error('Fallback permission request failed:', fallbackError);
-      return false;
+    if (!isOneSignalSafe()) {
+      console.warn(`⚠️ OneSignal not safe to call ${methodName}`);
+      return fallback;
     }
+    
+    return await methodCall();
+  } catch (error) {
+    console.error(`❌ OneSignal ${methodName} failed:`, error.message);
+    return fallback;
   }
 };
 
-/**
- * Send a test notification
- */
-export const sendTestNotification = async () => {
+// Enhanced OneSignal initialization with better error handling
+export const initializeOneSignalEnhanced = async () => {
+  if (!isOneSignalConfigured()) {
+    console.warn('⚠️ OneSignal not configured, skipping initialization');
+    return { success: false, reason: 'not_configured' };
+  }
+
   try {
-    // Check if OneSignal is configured
-    if (!isOneSignalConfigured()) {
-      console.warn('⚠️ OneSignal not configured. Cannot send test notification.');
-      throw new Error('OneSignal not configured');
-    }
-
-    const OneSignal = await waitForOneSignal();
-    const config = getOneSignalConfig();
+    console.log('🚀 Enhanced OneSignal initialization starting...');
     
-    // Get the user's OneSignal ID
-    const userId = await OneSignal.User.PushSubscription.id;
-    
-    if (!userId) {
-      throw new Error('User not subscribed');
-    }
-
-    // Send test notification using OneSignal REST API
-    const response = await fetch('https://onesignal.com/api/v1/notifications', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Basic ${config.restApiKey}`
-      },
-      body: JSON.stringify({
-        app_id: config.appId,
-        include_player_ids: [userId],
-        headings: { en: "🎂 Test from Celefy!" },
-        contents: { en: "Your push notifications are working perfectly! 🎉" },
-        url: window.location.origin
-      })
-    });
-
-    if (response.ok) {
-      console.log('✅ Test notification sent successfully');
-      return true;
-    } else {
-      throw new Error('Failed to send notification');
-    }
-  } catch (error) {
-    console.error('Error sending test notification:', error);
-    
-    // Fallback: Show browser notification
-    if (Notification.permission === 'granted') {
-      new Notification('🎂 Test from Celefy!', {
-        body: 'Your push notifications are working! 🎉',
-        icon: '/icons/icon-192.png'
+    // Wait for OneSignal to be available
+    if (!window.OneSignal) {
+      console.log('⏳ Waiting for OneSignal SDK to load...');
+      await new Promise((resolve) => {
+        const checkOneSignal = () => {
+          if (window.OneSignal) {
+            resolve();
+          } else {
+            setTimeout(checkOneSignal, 100);
+          }
+        };
+        checkOneSignal();
       });
-      return true;
     }
+
+    // CRITICAL FIX: Check if OneSignal is safe before proceeding
+    if (!isOneSignalSafe()) {
+      console.warn('⚠️ OneSignal not safe to initialize, skipping');
+      return { success: false, reason: 'not_safe' };
+    }
+
+    // Initialize with enhanced options
+    const initOptions = getOneSignalInitOptions();
+    console.log('⚙️ Initializing OneSignal with options:', initOptions);
     
-    return false;
+    await window.OneSignal.init(initOptions);
+    
+    console.log('✅ Enhanced OneSignal initialization successful');
+    return { success: true };
+    
+  } catch (error) {
+    console.error('❌ Enhanced OneSignal initialization failed:', error);
+    return { success: false, error: error.message };
   }
 };
 
-/**
- * Unsubscribe from notifications
- */
-export const unsubscribe = async () => {
+// Enhanced permission request with better UX and error handling
+export const requestNotificationPermissionEnhanced = async (birthdayName = null) => {
+  if (!isOneSignalSafe()) {
+    throw new Error('OneSignal not available or not safe');
+  }
+
   try {
-    const OneSignal = await waitForOneSignal();
+    console.log('🔔 Enhanced permission request starting...');
     
-    // Unsubscribe using OneSignal
-    await OneSignal.User.PushSubscription.optOut();
+    // Check current permission
+    const currentPermission = Notification.permission;
+    console.log('Current permission:', currentPermission);
     
-    console.log('✅ Successfully unsubscribed');
+    if (currentPermission === 'granted') {
+      console.log('✅ Permission already granted');
+      return { success: true, permission: 'granted', alreadyGranted: true };
+    }
+    
+    if (currentPermission === 'denied') {
+      console.log('❌ Permission previously denied');
+      return { 
+        success: false, 
+        permission: 'denied', 
+        error: 'Notifications were previously blocked. Please enable them in your browser settings.' 
+      };
+    }
+
+    // Show custom prompt with context
+    const userMessage = birthdayName 
+      ? `Get reminded about ${birthdayName}'s birthday and never miss a celebration! 🎉`
+      : 'Get birthday reminders and never miss a celebration! 🎉';
+    
+    const userConfirmed = confirm(
+      `🎂 Birthday Reminders\n\n${userMessage}\n\nWould you like to enable notifications?`
+    );
+    
+    if (!userConfirmed) {
+      console.log('👎 User declined permission prompt');
+      return { success: false, permission: 'default', userDeclined: true };
+    }
+
+    // CRITICAL FIX: Safe permission request through OneSignal
+    console.log('📱 Requesting permission through OneSignal...');
+    const permissionResult = await safeOneSignalCall(
+      'Notifications.requestPermission',
+      () => window.OneSignal.Notifications.requestPermission(),
+      false
+    );
+    
+    console.log('Permission result:', permissionResult);
+    
+    if (permissionResult) {
+      console.log('✅ Enhanced permission granted successfully');
+      return { success: true, permission: 'granted' };
+    } else {
+      console.log('❌ Enhanced permission denied');
+      return { success: false, permission: 'denied' };
+    }
+    
+  } catch (error) {
+    console.error('❌ Enhanced permission request failed:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+// Enhanced subscription status check with safety
+export const getEnhancedSubscriptionStatus = async () => {
+  if (!isOneSignalSafe()) {
+    return { 
+      available: false, 
+      subscribed: false, 
+      error: 'OneSignal not available or not safe' 
+    };
+  }
+
+  try {
+    const [permission, subscribed, userId] = await Promise.all([
+      Promise.resolve(Notification.permission),
+      safeOneSignalCall(
+        'User.PushSubscription.optedIn',
+        () => window.OneSignal.User.PushSubscription.optedIn,
+        false
+      ),
+      safeOneSignalCall(
+        'User.PushSubscription.id',
+        () => window.OneSignal.User.PushSubscription.id,
+        null
+      )
+    ]);
+
+    return {
+      available: true,
+      permission,
+      subscribed,
+      userId,
+      ready: !!(permission === 'granted' && subscribed && userId)
+    };
+    
+  } catch (error) {
+    console.error('❌ Error getting enhanced subscription status:', error);
+    return { 
+      available: false, 
+      subscribed: false, 
+      error: error.message 
+    };
+  }
+};
+
+// Legacy compatibility functions for existing components
+export const isSubscribed = async () => {
+  const status = await getEnhancedSubscriptionStatus();
+  return status.subscribed;
+};
+
+export const sendTestNotification = async () => {
+  if (!isOneSignalSafe()) {
+    return false;
+  }
+
+  try {
+    // Send a test notification using OneSignal
+    await safeOneSignalCall(
+      'Notifications.add',
+      () => window.OneSignal.Notifications.add({
+        title: '🎉 Test Notification',
+        message: 'This is a test notification from Celefy!',
+        url: window.location.href
+      }),
+      false
+    );
     return true;
   } catch (error) {
-    console.error('Error unsubscribing:', error);
+    console.error('Failed to send test notification:', error);
     return false;
   }
 };
 
-/**
- * Get basic debug information
- */
+export const unsubscribe = async () => {
+  if (!isOneSignalSafe()) {
+    return false;
+  }
+
+  try {
+    await safeOneSignalCall(
+      'User.PushSubscription.optOut',
+      () => window.OneSignal.User.PushSubscription.optOut(),
+      false
+    );
+    return true;
+  } catch (error) {
+    console.error('Failed to unsubscribe:', error);
+    return false;
+  }
+};
+
 export const getDebugInfo = () => {
   return {
-    oneSignalLoaded: typeof window.OneSignal !== 'undefined',
-    notificationSupport: 'Notification' in window,
-    permission: Notification.permission,
-    isHttps: location.protocol === 'https:',
-    domain: location.hostname,
-    oneSignalConfigured: isOneSignalConfigured()
+    oneSignalAvailable: !!window.OneSignal,
+    oneSignalSafe: isOneSignalSafe(),
+    notificationPermission: Notification.permission,
+    userAgent: navigator.userAgent,
+    timestamp: new Date().toISOString()
   };
+};
+
+export default {
+  isOneSignalSafe,
+  safeOneSignalCall,
+  initializeOneSignalEnhanced,
+  requestNotificationPermissionEnhanced,
+  getEnhancedSubscriptionStatus,
+  isSubscribed,
+  sendTestNotification,
+  unsubscribe,
+  getDebugInfo
 };

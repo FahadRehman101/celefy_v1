@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { isSubscribed, requestPermission, sendTestNotification, unsubscribe, getDebugInfo } from '@/utils/onesignal';
+import { isSubscribed, requestNotificationPermissionEnhanced, sendTestNotification, unsubscribe, getDebugInfo } from '@/utils/onesignal';
 
 const OneSignalTester = () => {
   const [subscribed, setSubscribed] = useState(false);
@@ -24,10 +24,10 @@ const OneSignalTester = () => {
   const handleSubscribe = async () => {
     setRequesting(true);
     try {
-      const granted = await requestPermission();
-      setSubscribed(granted);
+      const result = await requestNotificationPermissionEnhanced();
+      setSubscribed(result.success);
       
-      if (granted) {
+      if (result.success) {
         alert('🎉 Successfully subscribed to notifications!');
       } else {
         alert('❌ Permission denied. Please check your browser settings.');

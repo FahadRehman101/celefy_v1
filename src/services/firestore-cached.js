@@ -11,7 +11,16 @@ import {
     serverTimestamp
   } from 'firebase/firestore';
   import { db } from '@/config/firebase';
-  import localStorage from './localStorage';
+  import { 
+  getCachedBirthdays, 
+  cacheBirthdays, 
+  updateLastSyncTime, 
+  isOnline, 
+  addToSyncQueue,
+  getSyncQueue,
+  removeFromSyncQueue,
+  cacheUserProfile
+} from './localStorage';
   
   /**
    * Enhanced Firestore service with localStorage caching
@@ -30,7 +39,7 @@ import {
   
     try {
       // Step 1: Get cached data for instant loading
-      const cached = localStorage.getCachedBirthdays(userId);
+      const cached = getCachedBirthdays(userId);
       
       // Step 2: If we have cached data and no force sync, return it immediately
       if (!forceSync && cached.data.length > 0 && !cached.isStale) {
@@ -47,8 +56,8 @@ import {
       const serverData = await getBirthdaysFromServer(userId);
       
       // Step 4: Update cache with server data
-      localStorage.cacheBirthdays(userId, serverData);
-      localStorage.updateLastSyncTime(userId);
+      cacheBirthdays(userId, serverData);
+      updateLastSyncTime(userId);
       
       console.log('✅ Server data fetched and cached:', serverData.length, 'birthdays');
       
@@ -62,7 +71,7 @@ import {
       console.error('❌ getBirthdaysOptimized failed:', error);
       
       // Fallback to cached data if available
-      const cached = localStorage.getCachedBirthdays(userId);
+      const cached = getCachedBirthdays(userId);
       if (cached.data.length > 0) {
         console.log('📱 Fallback to cached data due to error');
         return {
@@ -116,7 +125,7 @@ import {
    * Add birthday with FIXED optimistic updates
    */
   export const addBirthdayOptimized = async (userId, birthdayData) => {
-    console.log('💾 Adding birthday (optimized):', birthdayData);
+    console.log('💾 Adding birthday (optimized):', { userId, birthdayData });
   
     // Generate optimistic data
     const optimisticId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -127,16 +136,23 @@ import {
       createdAt: new Date(),
       updatedAt: new Date()
     };
+    
+    console.log('🎂 Generated optimistic birthday:', optimisticBirthday);
   
     // IMMEDIATELY update cache for instant UI feedback
-    const cached = localStorage.getCachedBirthdays(userId);
-    const updatedCache = [optimisticBirthday, ...cached.data];
-    localStorage.cacheBirthdays(userId, updatedCache);
+    const cached = getCachedBirthdays(userId);
+    console.log('📱 Current cache:', { count: cached.data.length, data: cached.data });
     
-    console.log('📱 Added to cache immediately:', optimisticBirthday);
+    const updatedCache = [optimisticBirthday, ...cached.data];
+    cacheBirthdays(userId, updatedCache);
+    
+    console.log('📱 Updated cache with optimistic birthday:', { 
+      newCount: updatedCache.length, 
+      optimisticId: optimisticBirthday.id 
+    });
   
     // Try to sync to server
-    if (localStorage.isOnline()) {
+    if (isOnline()) {
       try {
         const docData = {
           ...birthdayData,
@@ -160,8 +176,13 @@ import {
           b.id === optimisticId ? realBirthday : b
         );
         
-        localStorage.cacheBirthdays(userId, finalCache);
-        localStorage.updateLastSyncTime(userId);
+        cacheBirthdays(userId, finalCache);
+        updateLastSyncTime(userId);
+        
+        console.log('📱 Cache updated with real birthday ID:', { 
+          finalCount: finalCache.length, 
+          realId: docRef.id 
+        });
         
         return docRef.id;
         
@@ -169,7 +190,7 @@ import {
         console.error('❌ Failed to add to server, keeping in cache:', error);
         
         // Add to sync queue for later
-        localStorage.addToSyncQueue(userId, {
+        addToSyncQueue(userId, {
           type: 'ADD_BIRTHDAY',
           data: birthdayData,
           optimisticId
@@ -182,7 +203,7 @@ import {
       // Offline: Add to sync queue
       console.log('📴 Offline: Adding to sync queue');
       
-      localStorage.addToSyncQueue(userId, {
+      addToSyncQueue(userId, {
         type: 'ADD_BIRTHDAY',
         data: birthdayData,
         optimisticId
@@ -206,11 +227,11 @@ import {
         : birthday
     );
     
-    localStorage.cacheBirthdays(userId, updatedCache);
+    cacheBirthdays(userId, updatedCache);
     console.log('📱 Updated cache immediately');
   
     // Try to sync to server
-    if (localStorage.isOnline()) {
+    if (isOnline()) {
       try {
         const birthdayRef = doc(db, BIRTHDAYS_COLLECTION, birthdayId);
         const docData = {
@@ -221,12 +242,12 @@ import {
         
         await updateDoc(birthdayRef, docData);
         console.log('✅ Birthday updated in Firestore');
-        localStorage.updateLastSyncTime(userId);
+        updateLastSyncTime(userId);
         
       } catch (error) {
         console.error('❌ Failed to update on server, keeping cached version:', error);
         
-        localStorage.addToSyncQueue(userId, {
+        addToSyncQueue(userId, {
           type: 'UPDATE_BIRTHDAY',
           birthdayId,
           data: updateData
@@ -235,7 +256,7 @@ import {
     } else {
       console.log('📴 Offline: Adding update to sync queue');
       
-      localStorage.addToSyncQueue(userId, {
+      addToSyncQueue(userId, {
         type: 'UPDATE_BIRTHDAY',
         birthdayId,
         data: updateData
@@ -250,30 +271,30 @@ import {
     console.log('🗑️ Deleting birthday (optimized):', birthdayId);
   
     // Store original for potential rollback
-    const cached = localStorage.getCachedBirthdays(userId);
+    const cached = getCachedBirthdays(userId);
     const originalData = cached.data;
     
     // IMMEDIATELY remove from cache
     const updatedCache = cached.data.filter(birthday => birthday.id !== birthdayId);
-    localStorage.cacheBirthdays(userId, updatedCache);
+    cacheBirthdays(userId, updatedCache);
     console.log('📱 Removed from cache immediately');
   
     // Try to sync to server
-    if (localStorage.isOnline()) {
+    if (isOnline()) {
       try {
         const birthdayRef = doc(db, BIRTHDAYS_COLLECTION, birthdayId);
         await deleteDoc(birthdayRef);
         
         console.log('✅ Birthday deleted from Firestore');
-        localStorage.updateLastSyncTime(userId);
+        updateLastSyncTime(userId);
         
       } catch (error) {
         console.error('❌ Failed to delete from server, rolling back cache:', error);
         
         // Rollback cache
-        localStorage.cacheBirthdays(userId, originalData);
+        cacheBirthdays(userId, originalData);
         
-        localStorage.addToSyncQueue(userId, {
+        addToSyncQueue(userId, {
           type: 'DELETE_BIRTHDAY',
           birthdayId
         });
@@ -283,7 +304,7 @@ import {
     } else {
       console.log('📴 Offline: Adding deletion to sync queue');
       
-      localStorage.addToSyncQueue(userId, {
+      addToSyncQueue(userId, {
         type: 'DELETE_BIRTHDAY',
         birthdayId
       });
@@ -294,12 +315,12 @@ import {
    * Sync pending changes when back online
    */
   export const syncPendingChanges = async (userId) => {
-    if (!localStorage.isOnline()) {
-      console.log('📴 Still offline, skipping sync');
-      return { success: false, reason: 'offline' };
-    }
-  
-    const queue = localStorage.getSyncQueue(userId);
+      if (!isOnline()) {
+    console.log('📴 Still offline, skipping sync');
+    return { success: false, reason: 'offline' };
+  }
+
+  const queue = getSyncQueue(userId);
     
     if (queue.length === 0) {
       console.log('📤 No pending changes to sync');
@@ -325,13 +346,13 @@ import {
             });
             
             // Update cached data with real ID
-            const cached = localStorage.getCachedBirthdays(userId);
+            const cached = getCachedBirthdays(userId);
             const updatedCache = cached.data.map(b => 
               b.id === operation.optimisticId 
                 ? { ...b, id: docRef.id }
                 : b
             );
-            localStorage.cacheBirthdays(userId, updatedCache);
+            cacheBirthdays(userId, updatedCache);
             
             break;
             
@@ -352,7 +373,7 @@ import {
             continue;
         }
         
-        localStorage.removeFromSyncQueue(userId, item.id);
+        removeFromSyncQueue(userId, item.id);
         synced++;
         
         console.log(`✅ Synced ${operation.type}`);
@@ -364,7 +385,7 @@ import {
     }
   
     if (synced > 0) {
-      localStorage.updateLastSyncTime(userId);
+      updateLastSyncTime(userId);
     }
   
     return { 
@@ -381,9 +402,9 @@ import {
   export const initializeUserProfileOptimized = async (userId, userData) => {
     console.log('🔥 Initializing user profile (optimized):', userId);
     
-    localStorage.cacheUserProfile(userId, userData);
+    cacheUserProfile(userId, userData);
     
-    if (localStorage.isOnline()) {
+    if (isOnline()) {
       try {
         const userRef = doc(db, USERS_COLLECTION, userId);
         const profileData = {

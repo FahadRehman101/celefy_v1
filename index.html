@@ -18,31 +18,77 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
 
-    <!-- OneSignal v16 SDK - FIXED VERSION -->
+    <!-- OneSignal v16 SDK - Enhanced Configuration -->
     <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
-
-<script>
-  // OneSignal initialization with centralized configuration
-  window.OneSignal = window.OneSignal || [];
-  OneSignal.push(function() {
-    OneSignal.init({
-      appId: "b714db0f-1b9e-4b4b-87fb-1d52c3309714",
-      safari_web_id: "web.onesignal.auto.145f18a4-510a-4781-b676-50fa3f7fa700",
-      notifyButton: { enable: true },
-      allowLocalhostAsSecureOrigin: true,
-      autoRegister: false,
-      welcomeNotification: {
-        title: "Welcome to Celefy! 🎉",
-        message: "Get notified about birthdays and celebrations!"
-      }
-    });
-    
-    console.log('✅ OneSignal initialized successfully');
-  });
-</script>
-
+  </head>
+  
   <body class="bg-light dark:bg-dark">
     <div id="root"></div>
+    
+    <!-- Enhanced OneSignal Initialization Script -->
+    <script>
+      // Enhanced OneSignal initialization with environment variable support
+      window.OneSignal = window.OneSignal || [];
+      
+      // Wait for DOM to be ready
+      document.addEventListener('DOMContentLoaded', function() {
+        console.log('🚀 Initializing Enhanced OneSignal...');
+        
+        OneSignal.push(function() {
+          OneSignal.init({
+            appId: "b714db0f-1b9e-4b4b-87fb-1d52c3309714",
+            safari_web_id: "web.onesignal.auto.145f18a4-510a-4781-b676-50fa3f7fa700",
+            
+            // Enhanced initialization options
+            notifyButton: { 
+              enable: false // We'll handle permission requests manually
+            },
+            
+            allowLocalhostAsSecureOrigin: true, // For development
+            autoRegister: false, // Manual registration control
+            autoResubscribe: true, // Auto-resubscribe if user re-enables
+            
+            // Enhanced service worker configuration
+            path: "/",
+            serviceWorkerPath: "/OneSignalSDKWorker.js",
+            serviceWorkerUpdaterPath: "/OneSignalSDKWorker.js",
+            
+            // Disable default prompts (we'll use custom ones)
+            promptOptions: {
+              slidedown: {
+                enabled: false
+              },
+              native: {
+                enabled: false
+              }
+            },
+            
+            // Enhanced welcome notification (disabled for custom flow)
+            welcomeNotification: {
+              disable: true
+            }
+          });
+          
+          console.log('✅ Enhanced OneSignal initialized successfully');
+          
+          // Enhanced initialization callback
+          OneSignal.on('initialized', function() {
+            console.log('🎯 OneSignal initialization completed');
+          });
+          
+          // Enhanced subscription change callback
+          OneSignal.on('subscriptionChange', function(isSubscribed) {
+            console.log('🔔 OneSignal subscription changed:', isSubscribed);
+          });
+          
+          // Enhanced permission change callback  
+          OneSignal.on('notificationPermissionChange', function(permission) {
+            console.log('🔐 OneSignal permission changed:', permission);
+          });
+        });
+      });
+    </script>
+    
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

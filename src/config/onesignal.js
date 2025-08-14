@@ -1,8 +1,3 @@
-/**
- * OneSignal Configuration
- * Centralized configuration for OneSignal push notifications
- */
-
 // OneSignal App Configuration
 export const ONESIGNAL_CONFIG = {
   // App ID from OneSignal dashboard
@@ -12,41 +7,73 @@ export const ONESIGNAL_CONFIG = {
   safariWebId: import.meta.env.VITE_ONESIGNAL_SAFARI_WEB_ID || "web.onesignal.auto.145f18a4-510a-4781-b676-50fa3f7fa700",
   
   // REST API Key for server-side operations
-  restApiKey: import.meta.env.VITE_ONESIGNAL_REST_API_KEY || "os_v2_app_w4knwdy3tzfuxb73dvjmgmexcscl4ueqd6uuqw4l4wiq3bt73qboswce2a2n3qqduy7qfjylxa7kltawenso7zfg36ju67kxxqy7d3q",
+  restApiKey: import.meta.env.VITE_ONESIGNAL_REST_API_KEY,
   
-  // 🔧 FIXED: Simplified notification settings (removed problematic androidChannelId)
+  // Enhanced notification settings for better reliability
   notificationSettings: {
     androidAccentColor: "FF9C27B0",
-    priority: 10
-    // Removed: smallIcon, largeIcon, androidChannelId (these need to be set up in OneSignal dashboard first)
+    priority: 10,
+    requireInteraction: true, // Keep notifications visible until user interacts
+    persistNotification: true, // Don't auto-dismiss notifications
+    showCreatedAt: true, // Show timestamp
+    autoResubscribe: true // Auto-resubscribe if permission granted again
   }
 };
 
-// Check if OneSignal is properly configured
+// Enhanced configuration validation
 export const isOneSignalConfigured = () => {
-  return !!(ONESIGNAL_CONFIG.appId && ONESIGNAL_CONFIG.restApiKey);
+  const hasAppId = !!(ONESIGNAL_CONFIG.appId && ONESIGNAL_CONFIG.appId !== "your_app_id_here");
+  const hasRestApiKey = !!(ONESIGNAL_CONFIG.restApiKey && ONESIGNAL_CONFIG.restApiKey !== "your_rest_api_key_here");
+  
+  return hasAppId && hasRestApiKey;
 };
 
-// Get OneSignal configuration with validation
+// Enhanced configuration getter with detailed validation
 export const getOneSignalConfig = () => {
-  if (!isOneSignalConfigured()) {
-    console.warn('⚠️ OneSignal configuration incomplete. Some features may not work properly.');
-    console.warn('Required environment variables: VITE_ONESIGNAL_APP_ID, VITE_ONESIGNAL_REST_API_KEY');
+  const config = ONESIGNAL_CONFIG;
+  
+  if (!config.appId || config.appId === "your_app_id_here") {
+    console.warn('⚠️ OneSignal App ID not configured. Set VITE_ONESIGNAL_APP_ID in your .env file');
   }
   
-  return ONESIGNAL_CONFIG;
+  if (!config.restApiKey || config.restApiKey === "your_rest_api_key_here") {
+    console.warn('⚠️ OneSignal REST API Key not configured. Set VITE_ONESIGNAL_REST_API_KEY in your .env file');
+  }
+  
+  return config;
 };
 
-// OneSignal initialization options
+// Enhanced OneSignal initialization options
 export const getOneSignalInitOptions = () => ({
   appId: ONESIGNAL_CONFIG.appId,
   safari_web_id: ONESIGNAL_CONFIG.safariWebId,
-  notifyButton: { enable: true },
-  allowLocalhostAsSecureOrigin: true,
-  autoRegister: false,
+  
+  // Enhanced initialization settings
+  notifyButton: { 
+    enable: false // We'll use custom permission flow
+  },
+  
+  allowLocalhostAsSecureOrigin: true, // For development
+  autoRegister: false, // We'll handle registration manually
+  autoResubscribe: true, // Auto-resubscribe if user re-enables notifications
+  
+  // Enhanced welcome notification
   welcomeNotification: {
-    title: "Welcome to Celefy! 🎉",
-    message: "Get notified about birthdays and celebrations!"
+    disable: true // We'll show custom welcome message
+  },
+  
+  // Service worker path (important for production)
+  path: "/",
+  serviceWorkerPath: "/OneSignalSDKWorker.js",
+  
+  // Enhanced prompt settings
+  promptOptions: {
+    slidedown: {
+      enabled: false // We'll use custom prompts
+    },
+    native: {
+      enabled: false // We'll trigger native prompt ourselves
+    }
   }
 });
 

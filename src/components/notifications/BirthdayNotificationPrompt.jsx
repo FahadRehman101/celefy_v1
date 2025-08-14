@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import Modal from '@/components/ui/Modal';
 import Button from '@/components/ui/Button';
 import { Bell, Gift, Sparkles, Calendar } from 'lucide-react';
-import { requestPermission } from '@/utils/onesignal';
+import { requestNotificationPermissionEnhanced } from '@/utils/onesignal';
 import { STORAGE_KEYS } from '@/utils/constants';
 
 const BirthdayNotificationPrompt = ({ isOpen, onClose, friendName }) => {
@@ -11,9 +11,9 @@ const BirthdayNotificationPrompt = ({ isOpen, onClose, friendName }) => {
   const handleEnableNotifications = async () => {
     setIsEnabling(true);
     try {
-      const granted = await requestPermission();
+      const result = await requestNotificationPermissionEnhanced(friendName);
       
-      if (granted) {
+      if (result.success) {
         // Success - show celebration
         onClose('success');
       } else {

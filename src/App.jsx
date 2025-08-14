@@ -9,6 +9,7 @@ import NotificationPermissionModal from '@/components/notifications/Notification
 import { NotificationSuccessModal, NotificationDeniedModal } from '@/components/notifications/NotificationFeedback';
 import { useSmartNotifications } from '@/hooks/useSmartNotifications';
 import { useNotificationPermission } from '@/hooks/useNotificationPermission';
+import ErrorBoundary from '@/components/ui/ErrorBoundary';
 
 import Login from '@/pages/Login';
 import Dashboard from '@/pages/Dashboard';
@@ -211,72 +212,74 @@ const App = () => {
   }
 
   return (
-    <div className={`min-h-screen transition-colors duration-300 ${
-      darkMode ? 'dark bg-gray-900' : 'bg-gray-50'
-    }`}>
-      
-      {/* Main App Content */}
-      {!user ? (
-        <Login />
-      ) : (
-        <>
-          <Navigation 
-            currentPage={currentPage}
-            setCurrentPage={setCurrentPage}
-            darkMode={darkMode}
-            setDarkMode={toggleDarkMode}
-            user={user}
-          />
-          
-          <main className="pb-20">
-            {/* Page content based on currentPage */}
-            {currentPage === 'dashboard' && (
-              <Dashboard 
-                user={user}
-                darkMode={darkMode}
-              />
-            )}
-            {currentPage === 'celebrity' && (
-              <CelebrityBirthdays 
-                birthdays={mockCelebrityBirthdays}
-                darkMode={darkMode}
-              />
-            )}
-            {currentPage === 'stories' && (
-              <Stories 
-                stories={mockStories}
-                darkMode={darkMode}
-              />
-            )}
-          </main>
-        </>
-      )}
+    <ErrorBoundary>
+      <div className={`min-h-screen transition-colors duration-300 ${
+        darkMode ? 'dark bg-gray-900' : 'bg-gray-50'
+      }`}>
+        
+        {/* Main App Content */}
+        {!user ? (
+          <Login />
+        ) : (
+          <>
+            <Navigation 
+              currentPage={currentPage}
+              setCurrentPage={setCurrentPage}
+              darkMode={darkMode}
+              setDarkMode={toggleDarkMode}
+              user={user}
+            />
+            
+            <main className="pb-20">
+              {/* Page content based on currentPage */}
+              {currentPage === 'dashboard' && (
+                <Dashboard 
+                  user={user}
+                  darkMode={darkMode}
+                />
+              )}
+              {currentPage === 'celebrity' && (
+                <CelebrityBirthdays 
+                  birthdays={mockCelebrityBirthdays}
+                  darkMode={darkMode}
+                />
+              )}
+              {currentPage === 'stories' && (
+                <Stories 
+                  stories={mockStories}
+                  darkMode={darkMode}
+                />
+              )}
+            </main>
+          </>
+        )}
 
-      {/* 🔧 NEW: Notification Permission Modal */}
-      <NotificationPermissionModal
-        isOpen={showPermissionModal}
-        onResponse={handlePermissionResponse}
-      />
-      
-      {/* Existing Notification Modals */}
-      {showPrompt && (
-        <BirthdayNotificationPrompt
-          isOpen={showPrompt}
-          onResponse={handlePromptResponse}
-          data={promptData}
+        {/* 🔧 NEW: Notification Permission Modal */}
+        <NotificationPermissionModal
+          isOpen={showPermissionModal}
+          onResponse={handlePermissionResponse}
         />
-      )}
-      
-      <NotificationSuccessModal 
-        isOpen={showSuccess}
-        onClose={() => setShowSuccess(false)}
-      />
-      
-      <NotificationDeniedModal 
-        isOpen={showDenied}
-        onClose={() => setShowDenied(false)}
-      />
-    </div>
+        
+        {/* Existing Notification Modals */}
+        {showPrompt && (
+          <BirthdayNotificationPrompt
+            isOpen={showPrompt}
+            onResponse={handlePromptResponse}
+            data={promptData}
+          />
+        )}
+        
+        <NotificationSuccessModal 
+          isOpen={showSuccess}
+          onClose={() => setShowSuccess(false)}
+        />
+        
+        <NotificationDeniedModal 
+          isOpen={showDenied}
+          onClose={() => setShowDenied(false)}
+        />
+      </div>
+    </ErrorBoundary>
   );
 };
 

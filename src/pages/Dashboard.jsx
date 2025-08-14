@@ -18,7 +18,8 @@ import Card from '@/components/ui/Card';
 import AddBirthdayModal from '@/components/birthday/AddBirthdayModal';
 import { calculateDaysUntilBirthday } from '@/utils/dates';
 import { getBirthdaysOptimized, syncPendingChanges } from '@/services/firestore-cached'; // Updated import
-import localStorage from '@/services/localStorage'; // Add localStorage import
+import { getCachedBirthdays, isOnline as isOnlineCheck, setupNetworkListeners, getSyncQueue } from '@/services/localStorage'; // Fixed import
+import ErrorBoundary from '@/components/ui/ErrorBoundary';
 
 const Dashboard = ({ user }) => {
   // State management
@@ -32,7 +33,7 @@ const Dashboard = ({ user }) => {
   
   // New state for caching and offline support
   const [dataSource, setDataSource] = useState('cache'); // 'cache', 'server', 'offline'
-  const [isOnline, setIsOnline] = useState(localStorage.isOnline());
+  const [isOnline, setIsOnline] = useState(isOnlineCheck());
   const [syncStatus, setSyncStatus] = useState('idle'); // 'idle', 'syncing', 'synced', 'error'
   const [pendingChanges, setPendingChanges] = useState(0);
 
@@ -44,9 +45,40 @@ const Dashboard = ({ user }) => {
     }
   }, [user?.uid]);
 
+  // Debug birthdays state changes
+  useEffect(() => {
+    console.log('🎂 Dashboard birthdays state updated:', {
+      count: birthdays.length,
+      birthdays: birthdays.map(b => ({ id: b.id, name: b.name, date: b.date }))
+    });
+    
+    // CRITICAL DEBUG: Check cache directly
+    if (user?.uid) {
+      try {
+        const cached = getCachedBirthdays(user.uid);
+        console.log('📱 Direct cache check:', {
+          count: cached.data.length,
+          data: cached.data.map(b => ({ id: b.id, name: b.name, date: b.date }))
+        });
+      } catch (error) {
+        console.error('❌ Failed to check cache directly:', error);
+      }
+    }
+  }, [birthdays, user?.uid]);
+
+  // Debug filtered birthdays
+  useEffect(() => {
+    console.log('🎂 Dashboard filtered birthdays:', {
+      count: filteredBirthdays.length,
+      filter: selectedFilter,
+      search: searchTerm,
+      birthdays: filteredBirthdays.map(b => ({ id: b.id, name: b.name, date: b.date }))
+    });
+  }, [filteredBirthdays, selectedFilter, searchTerm]);
+
   // Set up network listeners
   useEffect(() => {
-    const cleanup = localStorage.setupNetworkListeners(
+    const cleanup = setupNetworkListeners(
       () => {
         console.log('🌐 Back online!');
         setIsOnline(true);
@@ -120,7 +152,7 @@ const Dashboard = ({ user }) => {
    */
   const checkPendingChanges = () => {
     if (user?.uid) {
-      const queue = localStorage.getSyncQueue(user.uid);
+      const queue = getSyncQueue(user.uid); // Assuming getSyncQueue returns the queue
       setPendingChanges(queue.length);
     }
   };
@@ -162,16 +194,42 @@ const Dashboard = ({ user }) => {
  */
 const handleAddBirthday = (newBirthday) => {
   console.log('🎂 Dashboard: New birthday added:', newBirthday);
+  console.log('🎂 Current birthdays count:', birthdays.length);
+  console.log('🎂 New birthday ID:', newBirthday?.id);
+  console.log('🎂 New birthday name:', newBirthday?.name);
   
-  // DON'T optimistically update here - the cached service handles it
-  // Just close the modal and refresh from cache
+  // CRITICAL FIX: Add the new birthday to local state immediately
+  if (newBirthday && newBirthday.id) {
+    setBirthdays(prevBirthdays => {
+      console.log('🎂 Previous birthdays count:', prevBirthdays.length);
+      
+      // Check if birthday already exists to avoid duplicates
+      const exists = prevBirthdays.find(b => b.id === newBirthday.id);
+      if (exists) {
+        console.log('🎂 Birthday already exists in state, updating...');
+        return prevBirthdays.map(b => b.id === newBirthday.id ? newBirthday : b);
+      } else {
+        console.log('🎂 Adding new birthday to state...');
+        const updatedBirthdays = [newBirthday, ...prevBirthdays];
+        console.log('🎂 Updated birthdays count:', updatedBirthdays.length);
+        return updatedBirthdays;
+      }
+    });
+  } else {
+    console.error('❌ Invalid birthday data received:', newBirthday);
+  }
+  
+  // Close the modal
   setShowModal(false);
   
   // Check for pending changes
   checkPendingChanges();
   
-  // Refresh data from cache (this will show the new birthday immediately)
-  loadBirthdaysOptimized(false); // false = don't force server sync
+  // CRITICAL FIX: Force refresh from cache to ensure consistency
+  setTimeout(() => {
+    console.log('🎂 Refreshing birthdays from cache...');
+    loadBirthdaysOptimized(false); // false = don't force server sync
+  }, 100);
 };
 
   /**
@@ -281,168 +339,191 @@ const handleAddBirthday = (newBirthday) => {
   }
 
   return (
-    <div className="space-y-8">
-      {/* Welcome Header with Status Indicators */}
-      <Card variant="gradient" padding="lg">
-        <div className="flex items-start justify-between text-white">
-          <div>
-            <h1 className="text-3xl font-bold mb-2">
-              Welcome back, {user?.displayName?.split(' ')[0] || 'Friend'}! 🎉
-            </h1>
-            <p className="text-blue-100 text-lg mb-4">
-              {birthdays.length === 0 
-                ? "Ready to add your first birthday?" 
-                : `You're tracking ${birthdays.length} birthdays`}
-            </p>
-            
-            {/* Status indicators */}
-            <div className="flex items-center space-x-4 mb-4">
-              {/* Network Status */}
-              <div className="flex items-center space-x-2">
-                {isOnline ? (
-                  <Wifi className="w-4 h-4 text-green-300" />
-                ) : (
-                  <WifiOff className="w-4 h-4 text-red-300" />
-                )}
-                <span className="text-sm text-blue-100">
-                  {isOnline ? 'Online' : 'Offline'}
-                </span>
-              </div>
-
-              {/* Sync Status */}
-              <div className="flex items-center space-x-2">
-                <SyncIcon className={`w-4 h-4 ${syncInfo.color} ${syncInfo.spin ? 'animate-spin' : ''}`} />
-                <span className="text-sm text-blue-100">{syncInfo.text}</span>
-              </div>
-
-              {/* Data Source */}
-              <div className="text-sm text-blue-200">
-                Data: {dataSource === 'cache' ? '⚡ Cached' : '☁️ Live'}
-              </div>
-
-              {/* Pending Changes */}
-              {pendingChanges > 0 && (
-                <div className="text-sm text-yellow-200">
-                  {pendingChanges} pending change{pendingChanges !== 1 ? 's' : ''}
+    <ErrorBoundary>
+      <div className="space-y-8">
+        {/* Welcome Header with Status Indicators */}
+        <Card variant="gradient" padding="lg">
+          <div className="flex items-start justify-between text-white">
+            <div>
+              <h1 className="text-3xl font-bold mb-2">
+                Welcome back, {user?.displayName?.split(' ')[0] || 'Friend'}! 🎉
+              </h1>
+              <p className="text-blue-100 text-lg mb-4">
+                {birthdays.length === 0 
+                  ? "Ready to add your first birthday?" 
+                  : `You're tracking ${birthdays.length} birthdays`}
+              </p>
+              
+              {/* Status indicators */}
+              <div className="flex items-center space-x-4 mb-4">
+                {/* Network Status */}
+                <div className="flex items-center space-x-2">
+                  {isOnline ? (
+                    <Wifi className="w-4 h-4 text-green-300" />
+                  ) : (
+                    <WifiOff className="w-4 h-4 text-red-300" />
+                  )}
+                  <span className="text-sm text-blue-100">
+                    {isOnline ? 'Online' : 'Offline'}
+                  </span>
                 </div>
-              )}
+
+                {/* Sync Status */}
+                <div className="flex items-center space-x-2">
+                  <SyncIcon className={`w-4 h-4 ${syncInfo.color} ${syncInfo.spin ? 'animate-spin' : ''}`} />
+                  <span className="text-sm text-blue-100">{syncInfo.text}</span>
+                </div>
+
+                {/* Data Source */}
+                <div className="text-sm text-blue-200">
+                  Data: {dataSource === 'cache' ? '⚡ Cached' : '☁️ Live'}
+                </div>
+
+                {/* Pending Changes */}
+                {pendingChanges > 0 && (
+                  <div className="text-sm text-yellow-200">
+                    {pendingChanges} pending change{pendingChanges !== 1 ? 's' : ''}
+                  </div>
+                )}
+                
+                {/* CRITICAL DEBUG: Manual cache check button */}
+                <button
+                  onClick={() => {
+                    if (user?.uid) {
+                      try {
+                        const cached = getCachedBirthdays(user.uid);
+                        console.log('🔍 MANUAL CACHE CHECK:', {
+                          count: cached.data.length,
+                          data: cached.data.map(b => ({ id: b.id, name: b.name, date: b.date }))
+                        });
+                        alert(`Cache has ${cached.data.length} birthdays. Check console for details.`);
+                      } catch (error) {
+                        console.error('❌ Manual cache check failed:', error);
+                        alert('Cache check failed. Check console for details.');
+                      }
+                    }
+                  }}
+                  className="text-sm text-blue-200 hover:text-blue-100 bg-blue-500/20 px-2 py-1 rounded"
+                >
+                  🔍 Check Cache
+                </button>
+              </div>
+              
+              {/* Action Buttons */}
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={handleRefresh}
+                  disabled={refreshing}
+                  className="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition-colors flex items-center disabled:opacity-50"
+                >
+                  <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+                  {refreshing ? 'Syncing...' : 'Refresh'}
+                </button>
+
+                {/* Sync Pending Changes Button */}
+                {pendingChanges > 0 && isOnline && (
+                  <button
+                    onClick={handleSyncPendingChanges}
+                    disabled={syncStatus === 'syncing'}
+                    className="bg-yellow-500/20 hover:bg-yellow-500/30 px-4 py-2 rounded-lg transition-colors flex items-center disabled:opacity-50"
+                  >
+                    <Cloud className={`w-4 h-4 mr-2 ${syncStatus === 'syncing' ? 'animate-spin' : ''}`} />
+                    Sync Changes
+                  </button>
+                )}
+              </div>
             </div>
             
-            {/* Action Buttons */}
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={handleRefresh}
-                disabled={refreshing}
-                className="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition-colors flex items-center disabled:opacity-50"
-              >
-                <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
-                {refreshing ? 'Syncing...' : 'Refresh'}
-              </button>
+            <div className="text-right">
+              <Gift className="w-16 h-16 mb-2 opacity-80" />
+              <div className="text-sm text-blue-100">
+                Last updated: {new Date().toLocaleTimeString()}
+              </div>
+            </div>
+          </div>
+        </Card>
 
-              {/* Sync Pending Changes Button */}
-              {pendingChanges > 0 && isOnline && (
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <Card className="text-center p-6 hover:shadow-lg transition-shadow">
+            <Calendar className="w-12 h-12 mx-auto mb-3 text-blue-500" />
+            <div className="text-2xl font-bold text-gray-800">{countToday}</div>
+            <div className="text-gray-600">Today</div>
+          </Card>
+          
+          <Card className="text-center p-6 hover:shadow-lg transition-shadow">
+            <TrendingUp className="w-12 h-12 mx-auto mb-3 text-green-500" />
+            <div className="text-2xl font-bold text-gray-800">{countMonth}</div>
+            <div className="text-gray-600">This Month</div>
+          </Card>
+          
+          <Card className="text-center p-6 hover:shadow-lg transition-shadow">
+            <Gift className="w-12 h-12 mx-auto mb-3 text-purple-500" />
+            <div className="text-2xl font-bold text-gray-800">{countUpcoming}</div>
+            <div className="text-gray-600">Coming Soon</div>
+          </Card>
+        </div>
+
+        {/* Search and Filter Section */}
+        <Card className="p-6">
+          <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
+            <div className="relative flex-1 max-w-md">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+              <input
+                type="text"
+                placeholder="Search birthdays..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              />
+            </div>
+            
+            <div className="flex gap-2">
+              {['All', 'Today', 'This Month', 'Upcoming'].map((filter) => (
                 <button
-                  onClick={handleSyncPendingChanges}
-                  disabled={syncStatus === 'syncing'}
-                  className="bg-yellow-500/20 hover:bg-yellow-500/30 px-4 py-2 rounded-lg transition-colors flex items-center disabled:opacity-50"
+                  key={filter}
+                  onClick={() => setSelectedFilter(filter)}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    selectedFilter === filter
+                      ? 'bg-purple-500 text-white'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
                 >
-                  <Cloud className={`w-4 h-4 mr-2 ${syncStatus === 'syncing' ? 'animate-spin' : ''}`} />
-                  Sync Changes
+                  {filter}
                 </button>
-              )}
+              ))}
             </div>
+            
+            <button
+              onClick={() => setShowModal(true)}
+              className="bg-gradient-to-r from-pink-500 to-purple-500 text-white px-6 py-2 rounded-lg hover:shadow-lg transition-all flex items-center"
+            >
+              <Gift className="w-4 h-4 mr-2" />
+              Add Birthday
+            </button>
           </div>
-          
-          <div className="text-right">
-            <Gift className="w-16 h-16 mb-2 opacity-80" />
-            <div className="text-sm text-blue-100">
-              Last updated: {new Date().toLocaleTimeString()}
-            </div>
-          </div>
-        </div>
-      </Card>
-
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="text-center p-6 hover:shadow-lg transition-shadow">
-          <Calendar className="w-12 h-12 mx-auto mb-3 text-blue-500" />
-          <div className="text-2xl font-bold text-gray-800">{countToday}</div>
-          <div className="text-gray-600">Today</div>
         </Card>
-        
-        <Card className="text-center p-6 hover:shadow-lg transition-shadow">
-          <TrendingUp className="w-12 h-12 mx-auto mb-3 text-green-500" />
-          <div className="text-2xl font-bold text-gray-800">{countMonth}</div>
-          <div className="text-gray-600">This Month</div>
-        </Card>
-        
-        <Card className="text-center p-6 hover:shadow-lg transition-shadow">
-          <Gift className="w-12 h-12 mx-auto mb-3 text-purple-500" />
-          <div className="text-2xl font-bold text-gray-800">{countUpcoming}</div>
-          <div className="text-gray-600">Coming Soon</div>
-        </Card>
-      </div>
 
-      {/* Search and Filter Section */}
-      <Card className="p-6">
-        <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-            <input
-              type="text"
-              placeholder="Search birthdays..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-            />
-          </div>
-          
-          <div className="flex gap-2">
-            {['All', 'Today', 'This Month', 'Upcoming'].map((filter) => (
-              <button
-                key={filter}
-                onClick={() => setSelectedFilter(filter)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  selectedFilter === filter
-                    ? 'bg-purple-500 text-white'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
-              >
-                {filter}
-              </button>
-            ))}
-          </div>
-          
-          <button
-            onClick={() => setShowModal(true)}
-            className="bg-gradient-to-r from-pink-500 to-purple-500 text-white px-6 py-2 rounded-lg hover:shadow-lg transition-all flex items-center"
-          >
-            <Gift className="w-4 h-4 mr-2" />
-            Add Birthday
-          </button>
-        </div>
-      </Card>
+        {/* Birthday List */}
+        <BirthdayList 
+          birthdays={filteredBirthdays}
+          onRefresh={handleRefresh}
+          loading={refreshing}
+          userId={user?.uid}
+          onDataChange={() => {
+            checkPendingChanges();
+            // Small delay to let cache update
+            setTimeout(() => loadBirthdaysOptimized(), 100);
+          }}
+        />
 
-      {/* Birthday List */}
-      <BirthdayList 
-        birthdays={filteredBirthdays}
-        onRefresh={handleRefresh}
-        loading={refreshing}
-        userId={user?.uid}
-        onDataChange={() => {
-          checkPendingChanges();
-          // Small delay to let cache update
-          setTimeout(() => loadBirthdaysOptimized(), 100);
-        }}
-      />
-
-      {/* Add Birthday Modal */}
-      <AddBirthdayModal
-        isOpen={showModal}
-        onClose={() => setShowModal(false)}
-        onAdd={handleAddBirthday}
-       
-      />
+        {/* Add Birthday Modal */}
+        <AddBirthdayModal
+          isOpen={showModal}
+          onClose={() => setShowModal(false)}
+          onAdd={handleAddBirthday}
+         
+        />
 
 
 
@@ -463,7 +544,8 @@ const handleAddBirthday = (newBirthday) => {
   onClose={() => setShowModal(false)}
   onAdd={handleAddBirthday}
 />
-    </div>
+      </div>
+    </ErrorBoundary>
   );
 };
 
