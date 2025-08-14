@@ -178,6 +178,20 @@ const OneSignalTester = () => {
           <TestTube className="w-4 h-4" />
           <span>{testing ? 'Testing...' : 'Test Scheduling'}</span>
         </button>
+        
+        <button
+          onClick={async () => {
+            const result = await testNotificationSystem();
+            if (result.success) {
+              alert(result.message);
+            } else {
+              alert('Test failed: ' + result.error);
+            }
+          }}
+          className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+        >
+          Test Notification (30 sec delay)
+        </button>
       </div>
 
       {/* Test Results */}

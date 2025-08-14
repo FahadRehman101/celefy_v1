@@ -67,6 +67,21 @@ const AddBirthdayModal = ({ isOpen, onClose, onAdd }) => {
       const birthdayId = await addBirthdayOptimized(userId, birthdayData);
       console.log('✅ Birthday saved (optimized) with ID:', birthdayId);
 
+      // Schedule birthday reminders
+      try {
+        const reminderResult = await scheduleBirthdayReminders(
+          { ...birthdayData, id: birthdayId },
+          userId
+        );
+        if (reminderResult.success) {
+          console.log(`✅ Scheduled ${reminderResult.scheduledCount} birthday reminders!`);
+          setNotificationStatus(`Perfect! ${reminderResult.scheduledCount} reminders scheduled!`);
+        }
+      } catch (error) {
+        console.warn('Could not schedule reminders:', error);
+        // Don't block the birthday save
+      }
+
       // 🎯 NEW: Add birthday added notification to history
       addNotificationToHistory({
         type: NOTIFICATION_TYPES.BIRTHDAY_ADDED,

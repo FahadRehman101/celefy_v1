@@ -3,49 +3,23 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import './index.css';
-import { initializeOneSignal, getOneSignalStatus, debugOneSignalState, requestNotificationPermission } from './config/onesignal';
+import { initializeOneSignal, checkSubscriptionStatus, requestPermission } from './config/onesignal';
 
-// Enhanced service worker registration with OneSignal priority
 const registerServiceWorkers = async () => {
   if ('serviceWorker' in navigator) {
     try {
-      console.log('🔧 Enhanced service worker registration starting...');
+      // Register OneSignal worker first
+      const oneSignalWorker = await navigator.serviceWorker.register('/OneSignalSDKWorker.js');
+      console.log('✅ OneSignal worker registered');
       
-      // CRITICAL: OneSignal service worker MUST be registered first
-      console.log('📡 Registering OneSignal service worker first...');
-      const oneSignalWorker = await navigator.serviceWorker.register('/OneSignalSDKWorker.js', {
-        scope: '/',
-        updateViaCache: 'none'
-      });
-      console.log('✅ OneSignal service worker registered:', oneSignalWorker.scope);
-      
-      // Wait a bit to ensure OneSignal worker is fully active
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Then register PWA service worker with different scope
-      console.log('💾 Registering PWA service worker...');
+      // Then register PWA worker
       const pwaWorker = await navigator.serviceWorker.register('/sw.js', {
-        scope: '/app/',
-        updateViaCache: 'none'
+        scope: '/app/'
       });
-      console.log('✅ PWA service worker registered:', pwaWorker.scope);
-      
-      // Enhanced update handling
-      oneSignalWorker.addEventListener('updatefound', () => {
-        console.log('🔄 OneSignal service worker update found');
-      });
-      
-      pwaWorker.addEventListener('updatefound', () => {
-        console.log('🔄 PWA service worker update found');
-      });
-      
-      console.log('🎊 All service workers registered successfully');
-      
+      console.log('✅ PWA worker registered');
     } catch (error) {
-      console.error('❌ Enhanced service worker registration failed:', error);
+      console.error('Service worker error:', error);
     }
-  } else {
-    console.warn('⚠️ Service workers not supported in this browser');
   }
 };
 
@@ -61,12 +35,8 @@ const initializeApp = async () => {
     try {
       console.log('🔧 Starting OneSignal initialization...');
       
-      // Debug OneSignal state before initialization
-      debugOneSignalState();
-      
       // Check initial OneSignal status
-      const initialStatus = getOneSignalStatus();
-      console.log('📊 Initial OneSignal status:', initialStatus);
+      console.log('📊 Starting OneSignal initialization...');
       
       // Initialize OneSignal
       const oneSignal = await initializeOneSignal();
@@ -74,12 +44,8 @@ const initializeApp = async () => {
       if (oneSignal) {
         console.log('✅ OneSignal initialized successfully');
         
-        // Debug OneSignal state after initialization
-        debugOneSignalState();
-        
         // Check final status
-        const finalStatus = getOneSignalStatus();
-        console.log('📊 Final OneSignal status:', finalStatus);
+        console.log('📊 OneSignal initialization completed successfully');
         
         // Set up OneSignal event listeners
         try {
@@ -112,7 +78,7 @@ const initializeApp = async () => {
         // CRITICAL FIX: Automatically request notification permission and trigger subscription
         console.log('🔔 Automatically requesting notification permission...');
         try {
-          const permissionResult = await requestNotificationPermission();
+          const permissionResult = await requestPermission();
           if (permissionResult) {
             console.log('✅ Notification permission and subscription setup completed');
           } else {
@@ -124,13 +90,9 @@ const initializeApp = async () => {
         
       } else {
         console.warn('⚠️ OneSignal initialization failed - continuing without it');
-        // Debug OneSignal state after failed initialization
-        debugOneSignalState();
       }
     } catch (error) {
       console.warn('⚠️ OneSignal initialization failed - continuing without it:', error.message);
-      // Debug OneSignal state after error
-      debugOneSignalState();
       // Don't fail the entire app initialization for OneSignal issues
     }
     

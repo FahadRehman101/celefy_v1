@@ -1,4 +1,4 @@
-import { getOneSignalConfig, getOneSignalInitOptions, isOneSignalConfigured } from '@/config/onesignal';
+import { getOneSignalConfig, isOneSignalConfigured } from '@/config/onesignal';
 
 // CRITICAL FIX: Safe OneSignal availability check
 export const isOneSignalSafe = () => {
@@ -62,10 +62,10 @@ export const initializeOneSignalEnhanced = async () => {
     }
 
     // Initialize with enhanced options
-    const initOptions = getOneSignalInitOptions();
-    console.log('⚙️ Initializing OneSignal with options:', initOptions);
+    // const initOptions = getOneSignalInitOptions();
+    // console.log('⚙️ Initializing OneSignal with options:', initOptions);
     
-    await window.OneSignal.init(initOptions);
+    // await window.OneSignal.init(initOptions);
     
     console.log('✅ Enhanced OneSignal initialization successful');
     return { success: true };

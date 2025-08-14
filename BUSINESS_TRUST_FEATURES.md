@@ -151,3 +151,4 @@ let you miss an important birthday.
 5. **Recommend the app** - professional experience
 
 **This transforms Celefy from a basic birthday app into a professional, trustworthy platform that users can rely on and recommend to others!** 🚀
+

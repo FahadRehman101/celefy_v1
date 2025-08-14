@@ -37,6 +37,22 @@ import {
   export const getBirthdaysOptimized = async (userId, forceSync = false) => {
     console.log('🚀 getBirthdaysOptimized called:', { userId, forceSync });
   
+    // TEMPORARY FIX: Force fresh fetch every time for debugging
+    if (userId) {
+      console.log('🧹 Clearing all cache for fresh start');
+      localStorage.removeItem(`birthdays_${userId}`);
+      localStorage.removeItem(`sync_time_${userId}`);
+      localStorage.removeItem(`sync_queue_${userId}`);
+      // Don't return cached data, always fetch fresh
+    }
+  
+    // Emergency check for stuck items
+    if (forceSync) {
+      console.log('🚨 Force sync requested - clearing all cache');
+      localStorage.removeItem(`birthdays_${userId}`);
+      localStorage.removeItem(`sync_time_${userId}`);
+    }
+  
     try {
       // Step 1: Get cached data for instant loading
       const cached = getCachedBirthdays(userId);
@@ -298,6 +314,9 @@ import {
           type: 'DELETE_BIRTHDAY',
           birthdayId
         });
+        
+        console.error('Delete failed, forcing cache clear');
+        localStorage.removeItem(`birthdays_${userId}`);
         
         throw error; // Let UI know deletion failed
       }

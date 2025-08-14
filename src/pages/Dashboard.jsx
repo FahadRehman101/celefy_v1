@@ -385,6 +385,18 @@ const handleAddBirthday = (newBirthday) => {
               <span>Add Birthday</span>
               <span className="text-lg md:text-xl">✨</span>
             </button>
+            
+            <button
+              onClick={async () => {
+                console.log('🔄 Force syncing with Firebase...');
+                localStorage.clear();
+                await getBirthdaysOptimized(user.uid, true); // Force sync
+                window.location.reload();
+              }}
+              className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
+            >
+              Force Sync (Emergency)
+            </button>
           </div>
           
           {/* Simplified Stats - Only 4 Essential Sections */}
