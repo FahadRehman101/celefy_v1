@@ -14,13 +14,11 @@ export const ONESIGNAL_CONFIG = {
   // REST API Key for server-side operations
   restApiKey: import.meta.env.VITE_ONESIGNAL_REST_API_KEY || "os_v2_app_w4knwdy3tzfuxb73dvjmgmexcscl4ueqd6uuqw4l4wiq3bt73qboswce2a2n3qqduy7qfjylxa7kltawenso7zfg36ju67kxxqy7d3q",
   
-  // Notification settings
+  // 🔧 FIXED: Simplified notification settings (removed problematic androidChannelId)
   notificationSettings: {
     androidAccentColor: "FF9C27B0",
-    smallIcon: "ic_notification",
-    largeIcon: "https://your-app-domain.com/icon-512.png",
-    priority: 10,
-    androidChannelId: "birthday-reminders"
+    priority: 10
+    // Removed: smallIcon, largeIcon, androidChannelId (these need to be set up in OneSignal dashboard first)
   }
 };
 

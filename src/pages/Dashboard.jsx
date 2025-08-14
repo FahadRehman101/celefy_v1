@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import BirthdayList from '@/components/birthday/BirthdayList';
+import OneSignalTester from '@/components/debug/OneSignalTester';
 import {
   Gift,
   Calendar,
@@ -63,6 +64,7 @@ const Dashboard = ({ user }) => {
 
     return cleanup;
   }, [user?.uid]);
+  <OneSignalTester />
 
   /**
    * Load birthdays using optimized cached service
@@ -439,8 +441,28 @@ const handleAddBirthday = (newBirthday) => {
         isOpen={showModal}
         onClose={() => setShowModal(false)}
         onAdd={handleAddBirthday}
-        userId={user?.uid}
+       
       />
+
+
+
+
+{/* 🔧 ADD: OneSignal Debug Tester - Remove this in production */}
+{process.env.NODE_ENV === 'development' && (
+  <div className="mt-8">
+    <Card className="p-6">
+      <h3 className="text-lg font-semibold mb-4 text-gray-800">🔧 OneSignal Debug Tester</h3>
+      <OneSignalTester />
+    </Card>
+  </div>
+)}
+
+{/* Add Birthday Modal */}
+<AddBirthdayModal
+  isOpen={showModal}
+  onClose={() => setShowModal(false)}
+  onAdd={handleAddBirthday}
+/>
     </div>
   );
 };

@@ -1,17 +1,14 @@
+// 🔧 FIXED AddBirthdayModal.jsx - Proper auth handling
 import React, { useState } from 'react';
-import { scheduleBirthdayReminders } from '@/services/notificationScheduler'; // ✅ YES, import here
-import { useSmartNotifications } from '@/hooks/useSmartNotifications';
+import { Gift, X, CheckCircle, AlertCircle } from 'lucide-react';
 import Modal from '@/components/ui/Modal';
-import Input from '@/components/ui/Input';
-import Button from '@/components/ui/Button';
-import { Plus, Loader2, AlertCircle, CheckCircle, WifiOff, Bell } from 'lucide-react';
+import { RELATIONSHIP_OPTIONS } from '@/utils/constants';
 import { addBirthdayOptimized } from '@/services/firestore-cached';
-import localStorage from '@/services/localStorage';
+import { scheduleBirthdayReminders } from '@/services/notificationScheduler';
+import { useNotificationPermission } from '@/hooks/useNotificationPermission';
+import { auth } from '@/config/firebase'; // 🔧 ADD THIS IMPORT
 
-const AddBirthdayModal = ({ isOpen, onClose, onAdd, userId }) => {
-  const { triggerNotificationPrompt } = useSmartNotifications();
-  
-  // Form state
+const AddBirthdayModal = ({ isOpen, onClose, onAdd }) => {
   const [form, setForm] = useState({
     name: '',
     date: '',
@@ -20,124 +17,130 @@ const AddBirthdayModal = ({ isOpen, onClose, onAdd, userId }) => {
     isOnline: true,
   });
 
-  // UI state
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
-  const [notificationStatus, setNotificationStatus] = useState(''); // NEW: Track notification scheduling
-  const [isOnline] = useState(localStorage.isOnline());
+  const [notificationStatus, setNotificationStatus] = useState('');
 
-  /**
-   * Handle form submission with notification scheduling
-   */
- /**
- * Handle form submission with offline notification queue support
- */
-const handleSubmit = async (e) => {
-  e.preventDefault();
-  
-  // Validation
-  if (!form.name.trim() || !form.date || !form.relation.trim()) {
-    setError('Please fill in all required fields');
-    return;
-  }
+  // 🔧 NEW: Use notification permission hook
+  const { 
+    triggerPermissionPrompt, 
+    isNotificationEnabled,
+    permissionStatus 
+  } = useNotificationPermission();
 
-  // Clear previous states
-  setError('');
-  setSaving(true);
-  setNotificationStatus('Saving birthday...');
-
-  try {
-    console.log('💾 Saving birthday (optimized)...');
+  const handleSubmit = async (e) => {
+    e.preventDefault();
     
-    // Save using optimized service (instant cache + background sync)
-    const birthdayId = await addBirthdayOptimized(userId, {
-      name: form.name.trim(),
-      date: form.date,
-      relation: form.relation.trim(),
-      avatar: form.avatar,
-      isOnline: form.isOnline
-    });
+    if (!form.name.trim() || !form.date) {
+      setError('Please fill in all required fields.');
+      return;
+    }
 
-    console.log('✅ Birthday saved (optimized) with ID:', birthdayId);
-    
-    // Prepare birthday data for notification scheduling
-    const birthdayData = {
-      id: birthdayId,
-      name: form.name.trim(),
-      date: form.date,
-      relation: form.relation.trim(),
-      avatar: form.avatar
-    };
+    setSaving(true);
+    setError('');
+    setNotificationStatus('');
 
-    // 🔑 NEW: Smart notification scheduling with offline support
-    setNotificationStatus('Scheduling reminders...');
-    
     try {
-      // Check if we're online and try immediate scheduling
-      if (navigator.onLine) {
-        console.log('📶 Online - attempting immediate notification scheduling...');
-        
-        const notificationResult = await scheduleBirthdayReminders(birthdayData, userId);
-        
-        if (notificationResult.success) {
-          console.log('🔔 Birthday reminders scheduled successfully!');
-          setNotificationStatus('Perfect! Reminders scheduled for 7 days before, 1 day before, and on the day! 🔔');
-        } else if (notificationResult.requiresConfig) {
-          // OneSignal not configured - show helpful message
-          console.warn('⚠️ OneSignal not configured:', notificationResult.error);
-          setNotificationStatus('Birthday saved! 🔔 Enable notifications in settings to get birthday reminders.');
+      console.log('💾 Saving birthday (optimized)...');
+      
+      // 🔧 FIXED: Get user from Firebase Auth directly
+      const currentUser = auth.currentUser;
+      const userId = currentUser?.uid;
+      
+      if (!userId) {
+        throw new Error('User not authenticated. Please refresh and try again.');
+      }
+
+      console.log('✅ User authenticated:', userId);
+
+      const birthdayData = {
+        ...form,
+        name: form.name.trim(),
+        userId,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+
+      const birthdayId = await addBirthdayOptimized(birthdayData, userId);
+      console.log('✅ Birthday saved (optimized) with ID:', birthdayId);
+
+      // 🔧 NEW: Trigger permission prompt if this might be their first birthday
+      if (permissionStatus === 'default') {
+        console.log('🔔 Triggering permission prompt for first birthday...');
+        triggerPermissionPrompt(form.name.trim());
+      }
+
+      // Try to schedule notifications
+      try {
+        if (navigator.onLine) {
+          console.log('📶 Online - attempting immediate notification scheduling...');
+          
+          const notificationResult = await scheduleBirthdayReminders(
+            { ...birthdayData, id: birthdayId }, 
+            userId
+          );
+          
+          if (notificationResult.success && notificationResult.scheduledCount > 0) {
+            console.log('🔔 Birthday reminders scheduled successfully!');
+            setNotificationStatus(`Perfect! ${notificationResult.scheduledCount} reminders scheduled for 7 days before, 1 day before, and on the day! 🔔`);
+          } else if (notificationResult.requiresSubscription) {
+            console.warn('⚠️ User not subscribed to notifications:', notificationResult.error);
+            setNotificationStatus('Birthday saved! 🔔 Please enable notifications to get birthday reminders.');
+          } else if (notificationResult.requiresConfig) {
+            console.warn('⚠️ OneSignal not configured:', notificationResult.error);
+            setNotificationStatus('Birthday saved! 🔔 Notifications will be available when properly configured.');
+          } else {
+            throw new Error(notificationResult.error || 'Scheduling failed');
+          }
         } else {
-          throw new Error(notificationResult.error || 'Scheduling failed');
+          throw new Error('Currently offline');
         }
-      } else {
-        // We're offline, queue for later
-        throw new Error('Currently offline');
+        
+      } catch (schedulingError) {
+        console.warn('⚠️ Immediate scheduling failed, queuing for when online:', schedulingError.message);
+        
+        try {
+          const { queueNotificationScheduling } = await import('@/services/notificationQueue');
+          const queueResult = await queueNotificationScheduling(birthdayId, birthdayData, userId);
+          
+          if (queueResult.success) {
+            setNotificationStatus('Birthday saved! 📱 Reminders will be scheduled automatically when you\'re back online.');
+          } else {
+            setNotificationStatus('Birthday saved, but reminder scheduling failed. You can manually enable notifications later.');
+          }
+        } catch (queueError) {
+          console.error('Failed to queue notification:', queueError);
+          setNotificationStatus('Birthday saved! You can set up notifications in settings.');
+        }
       }
+
+      // Success UI updates
+      setSuccess(true);
       
-    } catch (schedulingError) {
-      console.warn('⚠️ Immediate scheduling failed, queuing for when online:', schedulingError.message);
-      
-      // Import queue function dynamically to avoid circular dependencies
-      const { queueNotificationScheduling } = await import('@/services/notificationQueue');
-      
-      const queueResult = await queueNotificationScheduling(birthdayId, birthdayData, userId);
-      
-      if (queueResult.success) {
-        setNotificationStatus('Birthday saved! 📱 Reminders will be scheduled automatically when you\'re back online.');
-      } else {
-        setNotificationStatus('Birthday saved, but reminder scheduling failed. You can manually enable notifications later.');
+      // Call parent callback to refresh birthday list
+      if (onAdd) {
+        onAdd({
+          id: birthdayId,
+          ...birthdayData
+        });
       }
+
+      // Auto-close modal after short delay
+      setTimeout(() => {
+        handleClose();
+      }, 2000);
+
+    } catch (error) {
+      console.error('❌ Error saving birthday:', error);
+      setError(error.message || 'Failed to save birthday. Please try again.');
+    } finally {
+      setSaving(false);
     }
+  };
 
-    // Success UI updates
-    setSuccess(true);
-    
-    // Call parent callback to refresh birthday list
-    if (onAdd) {
-      onAdd({
-        id: birthdayId,
-        ...birthdayData
-      });
-    }
-
-    // Auto-close modal after short delay
-    setTimeout(() => {
-      handleClose();
-    }, 2000);
-
-  } catch (error) {
-    console.error('❌ Error saving birthday:', error);
-    setError(error.message || 'Failed to save birthday. Please try again.');
-  } finally {
-    setSaving(false);
-  }
-};
-  /**
-   * Close modal and reset form
-   */
   const handleClose = () => {
-    if (saving) return; // Prevent closing while saving
+    if (saving) return;
     
     setForm({
       name: '',
@@ -153,12 +156,8 @@ const handleSubmit = async (e) => {
     onClose();
   };
 
-  /**
-   * Handle input changes
-   */
   const handleInputChange = (field, value) => {
     setForm(prev => ({ ...prev, [field]: value }));
-    // Clear error when user starts typing
     if (error) setError('');
   };
 
@@ -175,147 +174,105 @@ const handleSubmit = async (e) => {
           }`}>
             {success ? (
               <CheckCircle className="w-8 h-8 text-white" />
-            ) : saving ? (
-              <Loader2 className="w-8 h-8 text-white animate-spin" />
             ) : (
-              <Plus className="w-8 h-8 text-white" />
+              <Gift className="w-8 h-8 text-white" />
             )}
           </div>
-          
-          <h3 className="text-xl font-bold text-gray-800 mb-2">
-            {success ? '🎉 Birthday Added!' : 'Add a Birthday 🎂'}
-          </h3>
-          
-          <p className="text-gray-600">
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+            {success ? 'Birthday Added!' : 'Add New Birthday'}
+          </h2>
+          <p className="text-gray-600 dark:text-gray-300">
             {success 
-              ? !isOnline 
-                ? `${form.name}'s birthday saved locally! Will sync when back online.`
-                : `${form.name}'s birthday has been saved successfully!`
-              : 'Add a friend\'s birthday to start celebrating!'
+              ? 'Successfully added to your celebration list!' 
+              : 'Add someone special to never miss their birthday'
             }
           </p>
-
-          {/* Offline indicator */}
-          {!isOnline && !success && (
-            <div className="mt-3 flex items-center justify-center space-x-2 text-sm text-gray-500">
-              <WifiOff className="w-4 h-4" />
-              <span>Offline - will sync when reconnected</span>
-            </div>
-          )}
         </div>
 
-        {/* Success State with Notification Status */}
+        {/* Success state */}
         {success && (
-          <div className="text-center py-4 space-y-3">
-            <div className={`font-medium ${
-              isOnline ? 'text-green-600' : 'text-blue-600'
-            }`}>
-              {isOnline 
-                ? 'Birthday saved successfully! 🎉'
-                : 'Birthday saved offline! Will sync automatically. 📱'
-              }
-            </div>
-            
-            {/* Notification Status */}
+          <div className="text-center space-y-3">
+            <div className="text-6xl animate-bounce">🎉</div>
             {notificationStatus && (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                <div className="flex items-center justify-center space-x-2 text-blue-700">
-                  <Bell className="w-4 h-4" />
-                  <span className="text-sm">{notificationStatus}</span>
-                </div>
+              <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-3">
+                <p className="text-sm text-green-700 dark:text-green-300">
+                  {notificationStatus}
+                </p>
               </div>
             )}
-          </div>
-        )}
-
-        {/* Loading Status */}
-        {saving && notificationStatus && (
-          <div className="text-center py-2">
-            <div className="text-sm text-gray-600">
-              {notificationStatus}
-            </div>
           </div>
         )}
 
         {/* Form */}
         {!success && (
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-5">
             
-            {/* Error Display */}
-            {error && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-center">
-                <AlertCircle className="w-5 h-5 text-red-500 mr-3 flex-shrink-0" />
-                <span className="text-red-700 text-sm">{error}</span>
-              </div>
-            )}
-
             {/* Name Input */}
-            <Input
-              label="Friend's Name *"
-              value={form.name}
-              onChange={(e) => handleInputChange('name', e.target.value)}
-              placeholder="Enter their name"
-              disabled={saving}
-              required
-              maxLength={50}
-            />
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Name *
+              </label>
+              <input
+                type="text"
+                value={form.name}
+                onChange={(e) => handleInputChange('name', e.target.value)}
+                placeholder="Enter their name..."
+                className="w-full px-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-pink-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 transition-all"
+                disabled={saving}
+                required
+              />
+            </div>
 
             {/* Date Input */}
-            <Input
-              label="Birthday *"
-              type="date"
-              value={form.date}
-              onChange={(e) => handleInputChange('date', e.target.value)}
-              disabled={saving}
-              required
-              max={new Date().toISOString().split('T')[0]} // Can't be future date
-            />
-
-            {/* Relation Input */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Relationship *
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Birthday *
+              </label>
+              <input
+                type="date"
+                value={form.date}
+                onChange={(e) => handleInputChange('date', e.target.value)}
+                className="w-full px-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-pink-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white transition-all"
+                disabled={saving}
+                required
+              />
+            </div>
+
+            {/* Relationship Input */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Relationship
               </label>
               <select
                 value={form.relation}
                 onChange={(e) => handleInputChange('relation', e.target.value)}
+                className="w-full px-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-pink-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white transition-all"
                 disabled={saving}
-                required
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
               >
-                <option value="">Select relationship</option>
-                <option value="Family">Family</option>
-                <option value="Best Friend">Best Friend</option>
-                <option value="Friend">Friend</option>
-                <option value="Colleague">Colleague</option>
-                <option value="Partner">Partner</option>
-                <option value="Sibling">Sibling</option>
-                <option value="Parent">Parent</option>
-                <option value="Child">Child</option>
-                <option value="Grandparent">Grandparent</option>
-                <option value="Cousin">Cousin</option>
-                <option value="Neighbor">Neighbor</option>
-                <option value="Other">Other</option>
+                <option value="">Select relationship...</option>
+                {RELATIONSHIP_OPTIONS.map(option => (
+                  <option key={option} value={option}>{option}</option>
+                ))}
               </select>
             </div>
 
             {/* Avatar Selection */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Choose an Avatar
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                Choose Avatar
               </label>
-              <div className="flex flex-wrap gap-2">
-                {['🎉', '🎂', '🎈', '🎁', '🎊', '🥳', '💝', '🌟'].map((emoji) => (
+              <div className="grid grid-cols-6 gap-2">
+                {['🎉', '🎂', '🎈', '🎁', '🌟', '💝', '🎊', '🥳', '🎀', '🌸', '💐', '🍰'].map(emoji => (
                   <button
                     key={emoji}
                     type="button"
                     onClick={() => handleInputChange('avatar', emoji)}
-                    disabled={saving}
-                    className={`w-12 h-12 text-2xl rounded-lg border-2 transition-all hover:scale-110 disabled:hover:scale-100 disabled:opacity-50 ${
+                    className={`p-3 text-2xl rounded-lg border-2 transition-all hover:scale-110 ${
                       form.avatar === emoji
-                        ? 'border-purple-500 bg-purple-50'
-                        : 'border-gray-200 hover:border-purple-300'
+                        ? 'border-pink-500 bg-pink-50 dark:bg-pink-900/20'
+                        : 'border-gray-200 dark:border-gray-700 hover:border-pink-300'
                     }`}
+                    disabled={saving}
                   >
                     {emoji}
                   </button>
@@ -323,28 +280,38 @@ const handleSubmit = async (e) => {
               </div>
             </div>
 
-            {/* Submit Button */}
-            <div className="pt-4">
-              <Button 
-                type="submit" 
-                variant="primary"
-                disabled={saving || !form.name.trim() || !form.date || !form.relation.trim()}
-                loading={saving}
-                fullWidth
+            {/* Error Display */}
+            {error && (
+              <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3 flex items-center space-x-2">
+                <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0" />
+                <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div className="flex space-x-3 pt-4">
+              <button
+                type="button"
+                onClick={handleClose}
+                disabled={saving}
+                className="flex-1 px-6 py-3 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
               >
-                {saving ? 'Saving Birthday...' : 'Save Birthday'}
-              </Button>
-              
-              {/* Cancel Button */}
-              {!saving && (
-                <button
-                  type="button"
-                  onClick={handleClose}
-                  className="w-full mt-3 px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
-                >
-                  Cancel
-                </button>
-              )}
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={saving || !form.name.trim() || !form.date}
+                className="flex-1 px-6 py-3 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-500 text-white rounded-xl font-semibold transition-all shadow-lg hover:shadow-xl transform hover:scale-[1.02] disabled:transform-none"
+              >
+                {saving ? (
+                  <div className="flex items-center justify-center space-x-2">
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <span>Saving...</span>
+                  </div>
+                ) : (
+                  'Add Birthday'
+                )}
+              </button>
             </div>
           </form>
         )}

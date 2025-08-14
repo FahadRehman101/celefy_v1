@@ -26,9 +26,27 @@ dist-ssr
 # Local Netlify folder
 .netlify
 
-# Environment variables
+# 🔒 ENHANCED SECURITY - Environment variables
 .env
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
+
+# Build outputs
+build/
+.cache/
+
+# OS generated files
+Thumbs.db
+
+# IDE files
+*.swp
+*.swo
+
+# Firebase
+.firebase/
+firebase-debug.log
+
+# Local certificates
+*.pem

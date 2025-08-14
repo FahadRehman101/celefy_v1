@@ -1,115 +1,134 @@
 /**
- * OneSignal Notification Scheduler
- * Schedules birthday reminders that work without the app being opened
+ * OneSignal Notification Scheduler - FINAL WORKING VERSION
+ * Uses external user IDs for reliable notification delivery
  */
 
 import { getOneSignalConfig, isOneSignalConfigured } from '@/config/onesignal';
 
-// Get configuration safely
 const config = getOneSignalConfig();
 
-/**
- * Schedule all birthday notifications when birthday is added
- * This works completely independently - user never needs to open app again!
- */
-export const scheduleBirthdayReminders = async (birthday, userId) => {
-  console.log('📅 Scheduling birthday reminders for:', birthday.name);
+export const scheduleBirthdayReminders = async (birthday, firebaseUserId, userTimezone = null) => {
+  console.log('🎂 === STARTING BIRTHDAY REMINDER SCHEDULING ===');
+  console.log('👤 Firebase User ID:', firebaseUserId);
+  console.log('🎉 Birthday Person:', birthday.name);
+  console.log('📅 Birthday Date:', birthday.date);
 
-  // Check if OneSignal is configured
+  // Check OneSignal configuration
   if (!isOneSignalConfigured()) {
-    console.warn('⚠️ OneSignal not configured. Cannot schedule notifications.');
+    console.error('❌ OneSignal not configured');
     return { 
       success: false, 
-      error: 'OneSignal not configured. Please check your environment variables.',
+      error: 'OneSignal not configured. Check environment variables.',
       requiresConfig: true
     };
   }
 
+  // Check notification permission
+  if (Notification.permission !== 'granted') {
+    console.warn('⚠️ Notification permission not granted');
+    return {
+      success: false,
+      error: 'Please enable notifications first to receive birthday reminders.',
+      requiresSubscription: true
+    };
+  }
+
+  console.log('✅ OneSignal configured and permissions granted');
+
   try {
-    // Calculate notification dates
+    const timezone = userTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
     const birthDate = new Date(birthday.date);
     const currentYear = new Date().getFullYear();
     
-    // Get this year's birthday
+    // Calculate next birthday
     let nextBirthday = new Date(currentYear, birthDate.getMonth(), birthDate.getDate());
     
-    // If birthday already passed this year, schedule for next year
     if (nextBirthday <= new Date()) {
       nextBirthday.setFullYear(currentYear + 1);
     }
     
-    // Calculate notification times (9 AM local time)
-    const sevenDaysBefore = new Date(nextBirthday);
-    sevenDaysBefore.setDate(sevenDaysBefore.getDate() - 7);
-    sevenDaysBefore.setHours(9, 0, 0, 0);
+    console.log('📅 Next birthday will be:', nextBirthday.toLocaleDateString());
     
-    const oneDayBefore = new Date(nextBirthday);
-    oneDayBefore.setDate(oneDayBefore.getDate() - 1);
-    oneDayBefore.setHours(9, 0, 0, 0);
-    
-    const birthdayDay = new Date(nextBirthday);
-    birthdayDay.setHours(9, 0, 0, 0);
-    
-    // Schedule all 3 notifications
     const notifications = [];
+    const baseTime = new Date(nextBirthday);
+    baseTime.setHours(9, 0, 0, 0);
     
-    // Only schedule if the date is in the future
-    if (sevenDaysBefore > new Date()) {
-      notifications.push(await scheduleOneSignalNotification({
-        userId,
-        sendAfter: sevenDaysBefore.toISOString(),
-        title: "🎂 Birthday Reminder",
+    const scheduleData = [
+      { 
+        days: -7, 
+        title: "🎂 Birthday Reminder", 
         message: `${birthday.name}'s birthday is in 7 days! Time to plan something special.`,
-        data: { 
-          type: 'birthday_reminder_7d',
-          birthday_id: birthday.id,
-          birthday_name: birthday.name,
-          days_until: 7
+        type: 'birthday_reminder_7d'
+      },
+      { 
+        days: -1, 
+        title: "🎉 Birthday Tomorrow!", 
+        message: `Don't forget: ${birthday.name}'s birthday is tomorrow!`,
+        type: 'birthday_reminder_1d'
+      },
+      { 
+        days: 0, 
+        title: "🎂 Birthday Today!", 
+        message: `It's ${birthday.name}'s birthday today! 🎉`,
+        type: 'birthday_today'
+      }
+    ];
+    
+    console.log('🔔 Scheduling notifications...');
+    
+    for (const schedule of scheduleData) {
+      const notifyTime = new Date(baseTime);
+      notifyTime.setDate(notifyTime.getDate() + schedule.days);
+      
+      console.log(`⏰ ${schedule.type} scheduled for:`, notifyTime.toLocaleString());
+      
+      if (notifyTime > new Date()) {
+        try {
+          const result = await scheduleOneSignalNotification({
+            firebaseUserId: firebaseUserId,
+            sendAfter: notifyTime.toISOString(),
+            title: schedule.title,
+            message: schedule.message,
+            timezone: timezone,
+            data: { 
+              type: schedule.type,
+              birthday_id: birthday.id,
+              birthday_name: birthday.name,
+              days_until: Math.abs(schedule.days),
+              firebase_user_id: firebaseUserId
+            }
+          });
+          
+          if (result && result.id) {
+            notifications.push(result);
+            console.log(`🎯 SUCCESS: ${schedule.type} → Notification ID: ${result.id}`);
+          } else {
+            console.warn(`⚠️ ${schedule.type} scheduled but no ID returned:`, result);
+            notifications.push(result || { id: 'scheduled-no-id' });
+          }
+        } catch (scheduleError) {
+          console.error(`❌ FAILED: ${schedule.type} →`, scheduleError.message);
         }
-      }));
+      } else {
+        console.log(`⏭️ SKIPPED: ${schedule.type} (date in past)`);
+      }
     }
     
-    if (oneDayBefore > new Date()) {
-      notifications.push(await scheduleOneSignalNotification({
-        userId,
-        sendAfter: oneDayBefore.toISOString(),
-        title: "🎉 Birthday Tomorrow!",
-        message: `Don't forget: ${birthday.name}'s birthday is tomorrow! Have you prepared anything special?`,
-        data: { 
-          type: 'birthday_reminder_1d',
-          birthday_id: birthday.id,
-          birthday_name: birthday.name,
-          days_until: 1
-        }
-      }));
-    }
+    const successCount = notifications.length;
+    console.log('🎊 === SCHEDULING COMPLETE ===');
+    console.log(`✅ Successfully scheduled ${successCount} notifications`);
+    console.log('📋 Notification IDs:', notifications.map(n => n.id || 'no-id'));
     
-    if (birthdayDay > new Date()) {
-      notifications.push(await scheduleOneSignalNotification({
-        userId,
-        sendAfter: birthdayDay.toISOString(),
-        title: "🎂 Birthday Today!",
-        message: `It's ${birthday.name}'s birthday today! Don't forget to wish them well! 🎉`,
-        data: { 
-          type: 'birthday_today',
-          birthday_id: birthday.id,
-          birthday_name: birthday.name,
-          days_until: 0
-        }
-      }));
-    }
-    
-    console.log(`✅ Scheduled ${notifications.length} notifications for ${birthday.name}`);
-    
-    // Store notification IDs for potential cancellation
     return {
       success: true,
       notificationIds: notifications.filter(n => n.id).map(n => n.id),
-      scheduledFor: nextBirthday
+      scheduledFor: nextBirthday,
+      timezone: timezone,
+      scheduledCount: successCount
     };
     
   } catch (error) {
-    console.error('❌ Failed to schedule birthday reminders:', error);
+    console.error('💥 CRITICAL ERROR in scheduleBirthdayReminders:', error);
     return { success: false, error: error.message };
   }
 };
@@ -120,109 +139,89 @@ export const scheduleBirthdayReminders = async (birthday, userId) => {
 const scheduleOneSignalNotification = async (notificationData) => {
   const payload = {
     app_id: config.appId,
-    include_external_user_ids: [notificationData.userId],
+    include_external_user_ids: [notificationData.firebaseUserId],
     headings: { "en": notificationData.title },
     contents: { "en": notificationData.message },
-    send_after: notificationData.sendAfter, // 🔑 This is the magic!
-    data: notificationData.data,
-    
-    // Notification settings from config
-    android_accent_color: config.notificationSettings.androidAccentColor,
-    small_icon: config.notificationSettings.smallIcon,
-    large_icon: config.notificationSettings.largeIcon,
-    priority: config.notificationSettings.priority,
-    android_channel_id: config.notificationSettings.androidChannelId
+    send_after: notificationData.sendAfter,
+    data: notificationData.data
   };
+
+  // Add optional settings
+  if (config.notificationSettings?.androidAccentColor) {
+    payload.android_accent_color = config.notificationSettings.androidAccentColor;
+  }
   
-  console.log('📤 Scheduling OneSignal notification:', {
-    title: notificationData.title,
-    sendAfter: notificationData.sendAfter,
-    userId: notificationData.userId
-  });
+  if (config.notificationSettings?.priority) {
+    payload.priority = config.notificationSettings.priority;
+  }
+
+  if (notificationData.timezone) {
+    payload.timezone_id = notificationData.timezone;
+  }
   
-  const response = await fetch('https://onesignal.com/api/v1/notifications', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Basic ${config.restApiKey}`
-    },
-    body: JSON.stringify(payload)
-  });
+  console.log('📡 Making OneSignal API call...');
+  console.log('🎯 Target User ID:', notificationData.firebaseUserId);
+  console.log('📬 Notification:', notificationData.title);
+  console.log('⏰ Send After:', notificationData.sendAfter);
   
-  const result = await response.json();
-  
-  if (response.ok) {
-    console.log('✅ OneSignal notification scheduled:', result.id);
-    return result;
-  } else {
-    console.error('❌ OneSignal scheduling failed:', result);
-    throw new Error(result.errors?.[0] || 'Failed to schedule notification');
+  try {
+    const response = await fetch('https://onesignal.com/api/v1/notifications', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Basic ${config.restApiKey}`
+      },
+      body: JSON.stringify(payload)
+    });
+    
+    console.log('📊 OneSignal API Response Status:', response.status);
+    
+    const result = await response.json();
+    console.log('📋 OneSignal API Response:', result);
+    
+    if (response.ok) {
+      if (result.id) {
+        console.log('🎉 NOTIFICATION SCHEDULED SUCCESSFULLY!');
+        console.log('🔑 Notification ID:', result.id);
+        return result;
+      } else {
+        console.warn('⚠️ API success but no notification ID returned');
+        return result;
+      }
+    } else {
+      console.error('❌ OneSignal API Error:', result);
+      if (result.errors) {
+        console.error('📝 Error Details:', result.errors);
+      }
+      throw new Error(result.errors?.[0] || `API Error: ${response.status}`);
+    }
+  } catch (fetchError) {
+    console.error('🌐 Network Error:', fetchError);
+    throw new Error(`Network error: ${fetchError.message}`);
   }
 };
 
-/**
- * Cancel scheduled notifications (when birthday is deleted)
- */
 export const cancelBirthdayReminders = async (notificationIds) => {
-  console.log('🚫 Cancelling scheduled notifications:', notificationIds);
-  
-  // Check if OneSignal is configured
-  if (!isOneSignalConfigured()) {
-    console.warn('⚠️ OneSignal not configured. Cannot cancel notifications.');
-    return { 
-      success: false, 
-      error: 'OneSignal not configured. Please check your environment variables.',
-      requiresConfig: true
-    };
+  if (!isOneSignalConfigured() || !notificationIds?.length) {
+    return { success: true, cancelled: 0 };
   }
 
   try {
     const cancelPromises = notificationIds.map(async (id) => {
       const response = await fetch(`https://onesignal.com/api/v1/notifications/${id}`, {
         method: 'DELETE',
-        headers: {
-          'Authorization': `Basic ${config.restApiKey}`
-        }
+        headers: { 'Authorization': `Basic ${config.restApiKey}` }
       });
-      
       return response.ok;
     });
     
     const results = await Promise.all(cancelPromises);
-    console.log(`✅ Cancelled ${results.filter(r => r).length}/${notificationIds.length} notifications`);
+    const successCount = results.filter(r => r).length;
     
-    return { success: true, cancelled: results.filter(r => r).length };
+    return { success: true, cancelled: successCount };
   } catch (error) {
-    console.error('❌ Failed to cancel notifications:', error);
     return { success: false, error: error.message };
   }
 };
 
-/**
- * Reschedule notifications for next year (call this annually)
- */
-export const rescheduleForNextYear = async (birthdays, userId) => {
-  console.log('🔄 Rescheduling notifications for next year...');
-  
-  // Check if OneSignal is configured
-  if (!isOneSignalConfigured()) {
-    console.warn('⚠️ OneSignal not configured. Cannot reschedule notifications.');
-    return { 
-      success: false, 
-      error: 'OneSignal not configured. Please check your environment variables.',
-      requiresConfig: true
-    };
-  }
-  
-  for (const birthday of birthdays) {
-    await scheduleBirthdayReminders(birthday, userId);
-  }
-  
-  console.log('✅ All notifications rescheduled for next year');
-};
-
-export default {
-  scheduleBirthdayReminders,
-  cancelBirthdayReminders,
-  rescheduleForNextYear
-};
+export default { scheduleBirthdayReminders, cancelBirthdayReminders };
