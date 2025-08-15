@@ -59,9 +59,19 @@ const Spinner = ({
 };
 
 // Inline spinner for buttons and small spaces
-export const InlineSpinner = ({ size = 'sm', className = '' }) => (
-  <Loader2 className={`animate-spin ${sizes[size] || 'w-4 h-4'} ${className}`} />
-);
+export const InlineSpinner = ({ size = 'sm', className = '' }) => {
+  const sizeClasses = {
+    xs: 'w-3 h-3',
+    sm: 'w-4 h-4',
+    md: 'w-6 h-6',
+    lg: 'w-8 h-8',
+    xl: 'w-12 h-12'
+  };
+  
+  return (
+    <Loader2 className={`animate-spin ${sizeClasses[size] || 'w-4 h-4'} ${className}`} />
+  );
+};
 
 // Page loading spinner
 export const PageSpinner = ({ text = 'Loading...' }) => (

@@ -8,7 +8,7 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './src'),
+      '@': path.resolve(process.cwd(), './src'),
     },
   },
   // CRITICAL FIX: Build optimization to prevent initialization errors
@@ -74,13 +74,13 @@ export default defineConfig({
     }
   },
   
-  // CRITICAL: Define global variables safely
-  define: {
-    // Ensure process.env is available
-    'process.env': process.env,
-    // Define NODE_ENV
-    'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development')
-  },
+      // CRITICAL: Define global variables safely
+    define: {
+      // Ensure process.env is available
+      'process.env': {},
+      // Define NODE_ENV
+      'process.env.NODE_ENV': JSON.stringify('development')
+    },
   
   // CRITICAL: Optimize dependencies to prevent circular imports
   optimizeDeps: {

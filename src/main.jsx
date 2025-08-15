@@ -3,18 +3,18 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import './index.css';
-import { initializeOneSignal, checkSubscriptionStatus, requestPermission } from './config/onesignal';
+import { initializeOneSignal, requestPermission } from './config/onesignal';
 import { AuthProvider } from './hooks/useAuth';
 
 const registerServiceWorkers = async () => {
   if ('serviceWorker' in navigator) {
     try {
       // Register OneSignal worker first
-      const oneSignalWorker = await navigator.serviceWorker.register('/OneSignalSDKWorker.js');
+      await navigator.serviceWorker.register('/OneSignalSDKWorker.js');
       console.log('✅ OneSignal worker registered');
       
       // Then register PWA worker
-      const pwaWorker = await navigator.serviceWorker.register('/sw.js', {
+      await navigator.serviceWorker.register('/sw.js', {
         scope: '/app/'
       });
       console.log('✅ PWA worker registered');

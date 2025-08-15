@@ -169,7 +169,7 @@ const OneSignalConfigStatus = () => {
             <div className="flex items-center justify-between">
               <span className="text-gray-600 dark:text-gray-400">Safari Web ID:</span>
               <span className="text-sm font-mono bg-gray-200 dark:bg-gray-600 px-2 py-1 rounded">
-                {configStatus.config.safariWebId ? `${configStatus.config.safariWebId.substring(0, 8)}...` : 'Missing' : 'Missing'}
+                {configStatus.config.safariWebId ? `${configStatus.config.safariWebId.substring(0, 8)}...` : 'Missing'}
               </span>
             </div>
           </div>

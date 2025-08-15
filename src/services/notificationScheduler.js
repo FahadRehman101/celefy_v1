@@ -17,6 +17,69 @@ const generateUUID = () => {
 };
 
 /**
+ * Schedule a notification using OneSignal REST API
+ * @param {Object} notificationData - Notification data
+ * @returns {Promise<string>} - Notification ID
+ */
+export const scheduleNotification = async (notificationData) => {
+  try {
+    console.log('🔔 Scheduling notification:', notificationData);
+    
+    const config = getOneSignalConfig();
+    if (!config.appId || !config.restApiKey) {
+      throw new Error('OneSignal not configured');
+    }
+    
+    // Prepare notification payload
+    const payload = {
+      app_id: config.appId,
+      headings: { en: notificationData.title },
+      contents: { en: notificationData.message },
+      included_segments: ['All'],
+      send_after: notificationData.scheduledDate.toISOString(),
+      data: {
+        birthdayId: notificationData.birthdayId,
+        userId: notificationData.userId,
+        type: notificationData.type || 'birthday_reminder'
+      },
+      // Generate unique idempotency key to prevent duplicates
+      idempotency_key: generateUUID()
+    };
+    
+    // Send notification to OneSignal
+    const response = await fetch('https://onesignal.com/api/v1/notifications', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Basic ${config.restApiKey}`
+      },
+      body: JSON.stringify(payload)
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`OneSignal API error: ${errorText}`);
+    }
+    
+    const result = await response.json();
+    const notificationId = result.id;
+    
+    console.log('✅ Notification scheduled successfully:', notificationId);
+    
+    // Store metadata for future cancellation
+    if (notificationData.birthdayId) {
+      await storeNotificationMetadata(notificationData.birthdayId, [notificationId]);
+    }
+    
+    return notificationId;
+    
+  } catch (error) {
+    console.error('❌ Failed to schedule notification:', error);
+    throw new Error(`Notification scheduling failed: ${error.message}`);
+  }
+};
+
+/**
  * Store notification IDs for future cancellation
  */
 const storeNotificationMetadata = async (birthdayId, notificationIds) => {

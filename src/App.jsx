@@ -21,10 +21,6 @@ import OnboardingModal from '@/components/onboarding/OnboardingModal';
 import Navigation from '@/components/layout/Navigation';
 import PWAInstallPrompt from '@/components/PWAInstallPrompt';
 
-import {
-  mockBirthdays
-} from '@/utils/placeholders';
-
 const App = () => {
   // OneSignal is now initialized in main.jsx to prevent conflicts
   // This useEffect removed to prevent double initialization
@@ -40,31 +36,10 @@ const App = () => {
       return false;
     }
   });
-  const [currentPage, setCurrentPage] = useState('dashboard');
 
-  // CRITICAL FIX: Safe hook usage with error handling
-  let smartNotifications, notificationPermission;
-  try {
-    smartNotifications = useSmartNotifications();
-    notificationPermission = useNotificationPermission();
-  } catch (error) {
-    console.warn('⚠️ Hook initialization failed:', error.message);
-    // Fallback hooks
-    smartNotifications = {
-      showPrompt: false,
-      showSuccess: false,
-      showDenied: false,
-      promptData: null,
-      handlePromptResponse: () => {},
-      setShowSuccess: () => {},
-      setShowDenied: () => {}
-    };
-    notificationPermission = {
-      showPermissionModal: false,
-      handlePermissionResponse: () => {},
-      isNotificationEnabled: false
-    };
-  }
+  // CRITICAL FIX: Safe hook usage with error handling - moved outside conditional
+  const smartNotifications = useSmartNotifications();
+  const notificationPermission = useNotificationPermission();
 
   const {
     showPrompt,
@@ -78,8 +53,7 @@ const App = () => {
 
   const {
     showPermissionModal,
-    handlePermissionResponse,
-    isNotificationEnabled
+    handlePermissionResponse
   } = notificationPermission;
 
   // CRITICAL FIX: Safe dark mode toggle
@@ -195,15 +169,13 @@ const App = () => {
             
             <main className="pb-20">
               {/* Page content based on currentPage */}
-              {currentPage === 'dashboard' && (
-                <ErrorBoundary>
-                  <Dashboard 
-                    user={user}
-                    darkMode={darkMode}
-                    setDarkMode={toggleDarkMode}
-                  />
-                </ErrorBoundary>
-              )}
+              <ErrorBoundary>
+                <Dashboard 
+                  user={user}
+                  darkMode={darkMode}
+                  setDarkMode={toggleDarkMode}
+                />
+              </ErrorBoundary>
               {/* REMOVED: Celebrity page - Celebrities function removed */}
               {/* REMOVED: Stories page - Moved to future implementation guide */}
             </main>

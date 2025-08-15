@@ -101,34 +101,49 @@ import { cancelScheduledNotifications } from './notificationScheduler';
   const getBirthdaysFromServer = async (userId) => {
     console.log('🔥 Fetching birthdays from Firestore for user:', userId);
     
-    const birthdaysRef = collection(db, BIRTHDAYS_COLLECTION);
-    const q = query(
-      birthdaysRef, 
-      where('userId', '==', userId)
-    );
-    
-    const querySnapshot = await getDocs(q);
-    const birthdays = [];
-    
-    querySnapshot.forEach((doc) => {
-      const data = doc.data();
-      birthdays.push({
-        id: doc.id,
-        ...data,
-        createdAt: data.createdAt?.toDate(),
-        updatedAt: data.updatedAt?.toDate()
+    try {
+      // 🔧 CRITICAL FIX: Use the correct subcollection path that matches birthdayService.js
+      // This was reading from 'birthdays' collection but data is written to 'users/{userId}/birthdays'
+      const birthdaysRef = collection(db, USERS_COLLECTION, userId, BIRTHDAYS_COLLECTION);
+      
+      console.log('📍 Collection path:', `users/${userId}/birthdays`);
+      
+      // No need for userId filter since we're already in the user's subcollection
+      const q = query(birthdaysRef);
+      
+      const querySnapshot = await getDocs(q);
+      const birthdays = [];
+      
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        birthdays.push({
+          id: doc.id,
+          ...data,
+          createdAt: data.createdAt?.toDate(),
+          updatedAt: data.updatedAt?.toDate()
+        });
       });
-    });
-    
-    // Sort in JavaScript (newest first)
-    birthdays.sort((a, b) => {
-      const dateA = a.createdAt || new Date(0);
-      const dateB = b.createdAt || new Date(0);
-      return dateB - dateA;
-    });
-    
-    console.log('📊 Server returned:', birthdays.length, 'birthdays');
-    return birthdays;
+      
+      // Sort in JavaScript (newest first)
+      birthdays.sort((a, b) => {
+        const dateA = a.createdAt || new Date(0);
+        const dateB = b.createdAt || new Date(0);
+        return dateB - dateA;
+      });
+      
+      console.log('📊 Server returned:', birthdays.length, 'birthdays');
+      return birthdays;
+      
+    } catch (error) {
+      console.error('❌ Error fetching birthdays from server:', error);
+      console.error('❌ Error details:', {
+        code: error.code,
+        message: error.message,
+        userId: userId,
+        collectionPath: `users/${userId}/birthdays`
+      });
+      throw error;
+    }
   };
   
   /**
@@ -171,7 +186,8 @@ import { cancelScheduledNotifications } from './notificationScheduler';
           updatedAt: serverTimestamp()
         };
         
-        const birthdaysRef = collection(db, BIRTHDAYS_COLLECTION);
+        // 🔧 CRITICAL FIX: Use the correct subcollection path
+        const birthdaysRef = collection(db, USERS_COLLECTION, userId, BIRTHDAYS_COLLECTION);
         const docRef = await addDoc(birthdaysRef, docData);
         
         console.log('✅ Birthday added to Firestore:', docRef.id);
@@ -243,7 +259,8 @@ import { cancelScheduledNotifications } from './notificationScheduler';
     // Try to sync to server
     if (isOnline()) {
       try {
-        const birthdayRef = doc(db, BIRTHDAYS_COLLECTION, birthdayId);
+        // 🔧 CRITICAL FIX: Use the correct subcollection path
+        const birthdayRef = doc(db, USERS_COLLECTION, userId, BIRTHDAYS_COLLECTION, birthdayId);
         const docData = {
           ...updateData,
           userId,
@@ -295,7 +312,8 @@ import { cancelScheduledNotifications } from './notificationScheduler';
         console.log('Canceling notifications for birthday:', birthdayId);
         await cancelScheduledNotifications(birthdayId);
         
-        const birthdayRef = doc(db, BIRTHDAYS_COLLECTION, birthdayId);
+        // 🔧 CRITICAL FIX: Use the correct subcollection path
+        const birthdayRef = doc(db, USERS_COLLECTION, userId, BIRTHDAYS_COLLECTION, birthdayId);
         await deleteDoc(birthdayRef);
         
         console.log('✅ Birthday deleted from Firestore');
@@ -354,7 +372,8 @@ import { cancelScheduledNotifications } from './notificationScheduler';
         
         switch (operation.type) {
           case 'ADD_BIRTHDAY':
-            const docRef = await addDoc(collection(db, BIRTHDAYS_COLLECTION), {
+            // 🔧 CRITICAL FIX: Use the correct subcollection path
+            const docRef = await addDoc(collection(db, USERS_COLLECTION, userId, BIRTHDAYS_COLLECTION), {
               ...operation.data,
               userId,
               createdAt: serverTimestamp(),
@@ -373,7 +392,8 @@ import { cancelScheduledNotifications } from './notificationScheduler';
             break;
             
           case 'UPDATE_BIRTHDAY':
-            await updateDoc(doc(db, BIRTHDAYS_COLLECTION, operation.birthdayId), {
+            // 🔧 CRITICAL FIX: Use the correct subcollection path
+            await updateDoc(doc(db, USERS_COLLECTION, userId, BIRTHDAYS_COLLECTION, operation.birthdayId), {
               ...operation.data,
               userId,
               updatedAt: serverTimestamp()
@@ -381,7 +401,8 @@ import { cancelScheduledNotifications } from './notificationScheduler';
             break;
             
           case 'DELETE_BIRTHDAY':
-            await deleteDoc(doc(db, BIRTHDAYS_COLLECTION, operation.birthdayId));
+            // 🔧 CRITICAL FIX: Use the correct subcollection path
+            await deleteDoc(doc(db, USERS_COLLECTION, userId, BIRTHDAYS_COLLECTION, operation.birthdayId));
             break;
             
           default:

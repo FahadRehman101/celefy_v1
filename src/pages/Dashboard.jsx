@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import BirthdayList from '@/components/birthday/BirthdayList';
 import {
   Gift,
@@ -21,8 +21,8 @@ import {
 } from 'lucide-react';
 import AddBirthdayModal from '@/components/birthday/AddBirthdayModal';
 import { calculateDaysUntilBirthday } from '@/utils/dates';
-import { getBirthdaysOptimized, syncPendingChanges } from '@/services/firestore-cached'; // Updated import
-import { getCachedBirthdays, isOnline as isOnlineCheck, setupNetworkListeners, getSyncQueue } from '@/services/localStorage'; // Fixed import
+import { getBirthdaysOptimized, syncPendingChanges } from '@/services/firestore-cached';
+import { getCachedBirthdays, isOnline as isOnlineCheck, setupNetworkListeners, getSyncQueue } from '@/services/localStorage';
 import ErrorBoundary from '@/components/ui/ErrorBoundary';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/config/firebase';
@@ -30,6 +30,10 @@ import NotificationBell from '@/components/ui/NotificationBell';
 import NotificationCenter from '@/components/ui/NotificationCenter';
 import Profile from '@/components/ui/Profile';
 import ProfileSetupModal from '@/components/ui/ProfileSetupModal';
+
+// 🔧 CRITICAL FIX: Import Firestore for real-time listeners
+import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
+import { db } from '@/config/firebase';
 
 const Dashboard = ({ user, darkMode, setDarkMode }) => {
   // State management
@@ -58,20 +62,12 @@ const Dashboard = ({ user, darkMode, setDarkMode }) => {
   const [syncStatus, setSyncStatus] = useState('idle'); // 'idle', 'syncing', 'synced', 'error'
   const [pendingChanges, setPendingChanges] = useState(0);
 
-  // Load birthdays on component mount
-  useEffect(() => {
-    if (user?.uid) {
-      loadBirthdaysOptimized();
-      checkPendingChanges();
-      checkProfileSetup();
-    }
-  }, [user?.uid]);
+  // 🔧 CRITICAL FIX: Real-time listener state
+  const [listenerActive, setListenerActive] = useState(false);
 
-  // 🎯 NEW: Check if user needs profile setup
-  const checkProfileSetup = () => {
+  // 🔧 CRITICAL FIX: Define all functions with useCallback BEFORE useEffect hooks
+  const checkProfileSetup = useCallback(() => {
     // Check if user has completed profile setup
-    // For now, we'll check if they have a display name and birthday
-    // In a real app, you'd check a user profile document in Firestore
     const hasDisplayName = user?.displayName && user.displayName.trim().length > 0;
     const hasBirthday = user?.birthday && user.birthday.trim().length > 0;
     
@@ -80,10 +76,9 @@ const Dashboard = ({ user, darkMode, setDarkMode }) => {
       console.log('🎯 User needs profile setup:', { hasDisplayName, hasBirthday });
       setShowProfileSetup(true);
     }
-  };
+  }, [user?.displayName, user?.birthday]);
 
-  // 🎯 NEW: Handle profile setup completion
-  const handleProfileSetupComplete = async (profileData) => {
+  const handleProfileSetupComplete = useCallback(async (profileData) => {
     try {
       console.log('🎯 Profile setup completed:', profileData);
       
@@ -103,7 +98,359 @@ const Dashboard = ({ user, darkMode, setDarkMode }) => {
       console.error('❌ Failed to complete profile setup:', error);
       alert('Failed to save profile. Please try again.');
     }
-  };
+  }, []);
+
+  const loadBirthdaysOptimized = useCallback(async (forceSync = false) => {
+    try {
+      if (forceSync) {
+        setRefreshing(true);
+        setSyncStatus('syncing');
+      } else {
+        setLoading(true);
+      }
+      
+      setError(null);
+      
+      console.log('📊 Loading birthdays (optimized) for user:', user?.uid);
+      
+      const result = await getBirthdaysOptimized(user?.uid, forceSync);
+      
+      setBirthdays(result.data);
+      setDataSource(result.fromCache ? 'cache' : 'server');
+      
+      // Update sync status
+      if (result.synced) {
+        setSyncStatus('synced');
+        setTimeout(() => setSyncStatus('idle'), 2000); // Reset after 2 seconds
+      } else if (result.syncError) {
+        setSyncStatus('error');
+      } else if (result.syncing) {
+        setSyncStatus('syncing');
+      } else {
+        setSyncStatus('idle');
+      }
+      
+      console.log('✅ Birthdays loaded (optimized):', {
+        count: result.data.length,
+        source: result.fromCache ? 'cache' : 'server',
+        syncing: result.syncing
+      });
+      
+    } catch (err) {
+      console.error('❌ Failed to load birthdays:', err);
+      setError(err.message);
+      setSyncStatus('error');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [user?.uid]);
+
+  const checkPendingChanges = useCallback(() => {
+    if (user?.uid) {
+      const queue = getSyncQueue(user.uid); // Assuming getSyncQueue returns the queue
+      setPendingChanges(queue.length);
+    }
+  }, [user?.uid]);
+
+  const handleSyncPendingChanges = useCallback(async () => {
+    if (!user?.uid || !isOnline) return;
+
+    setSyncStatus('syncing');
+    
+    try {
+      const result = await syncPendingChanges(user.uid);
+      
+      if (result.success) {
+        console.log(`✅ Synced ${result.synced} pending changes`);
+        setSyncStatus('synced');
+        
+        // Refresh data from server to get latest
+        await loadBirthdaysOptimized(true);
+        checkPendingChanges();
+        
+        setTimeout(() => setSyncStatus('idle'), 2000);
+      } else {
+        setSyncStatus('error');
+      }
+    } catch (error) {
+      console.error('❌ Failed to sync pending changes:', error);
+      setSyncStatus('error');
+    }
+  }, [user?.uid, isOnline, loadBirthdaysOptimized, checkPendingChanges]);
+
+  const handleAddBirthday = useCallback((newBirthday) => {
+    console.log('🎂 Dashboard: New birthday added:', newBirthday);
+    console.log('🎂 Current birthdays count:', birthdays.length);
+    console.log('🎂 New birthday ID:', newBirthday?.id);
+    console.log('🎂 New birthday name:', newBirthday?.name);
+    
+    // CRITICAL FIX: Add the new birthday to local state immediately
+    if (newBirthday && newBirthday.id) {
+      setBirthdays(prevBirthdays => {
+        console.log('🎂 Previous birthdays count:', prevBirthdays.length);
+        
+        // Check if birthday already exists to avoid duplicates
+        const exists = prevBirthdays.find(b => b.id === newBirthday.id);
+        if (exists) {
+          console.log('🎂 Birthday already exists in state, updating...');
+          return prevBirthdays.map(b => b.id === newBirthday.id ? newBirthday : b);
+        } else {
+          console.log('🎂 Adding new birthday to state...');
+          const updatedBirthdays = [newBirthday, ...prevBirthdays];
+          console.log('🎂 Updated birthdays count:', updatedBirthdays.length);
+          return updatedBirthdays;
+        }
+      });
+    } else {
+      console.error('❌ Invalid birthday data received:', newBirthday);
+    }
+    
+    // Close the modal
+    setShowModal(false);
+    
+    // Check for pending changes
+    checkPendingChanges();
+    
+    // CRITICAL FIX: Force refresh from cache to ensure consistency
+    setTimeout(() => {
+      console.log('🎂 Refreshing birthdays from cache...');
+      loadBirthdaysOptimized(false); // false = don't force server sync
+    }, 100);
+  }, [birthdays, checkPendingChanges, loadBirthdaysOptimized]);
+
+  const handleRefresh = useCallback(() => {
+    loadBirthdaysOptimized(true);
+  }, [loadBirthdaysOptimized]);
+
+  const handleStatCardClick = useCallback((filterType) => {
+    setActiveFilter(filterType);
+    setSelectedFilter(filterType);
+    setCurrentScreen('filter'); // Switch to filter screen
+    
+    // 🎯 NEW: Push to browser history for mobile back button support
+    window.history.pushState({ filter: filterType }, '', `#${filterType.toLowerCase().replace(' ', '-')}`);
+  }, []);
+
+  const handleBackToHome = useCallback(() => {
+    setCurrentScreen('home');
+    setSelectedFilter('All');
+    setActiveFilter('All');
+    
+    // 🎯 NEW: Go back in browser history
+    window.history.back();
+  }, []);
+
+  const handleSearchClick = useCallback(() => {
+    console.log('🔍 Search bar clicked! Navigating to search screen...');
+    console.log('🔍 Current screen before:', currentScreen);
+    console.log('🔍 Current search term:', searchTerm);
+    console.log('🔍 Function called successfully');
+    
+    try {
+      setCurrentScreen('search');
+      setSearchTerm(''); // Clear search term when opening search screen
+      
+      // Push to browser history for back button support
+      window.history.pushState({ screen: 'search' }, '', '#search');
+      
+      console.log('🔍 Screen changed to:', 'search');
+      console.log('🔍 Search term cleared');
+      console.log('🔍 History state pushed');
+      
+      // Force a re-render to ensure the screen changes
+      setTimeout(() => {
+        console.log('🔍 After timeout - Current screen:', currentScreen);
+        console.log('🔍 After timeout - Search term:', searchTerm);
+      }, 100);
+      
+    } catch (error) {
+      console.error('❌ Error in handleSearchClick:', error);
+    }
+  }, [currentScreen, searchTerm]);
+
+  const handleBackFromSearch = useCallback(() => {
+    console.log('🔙 Back button clicked from search screen');
+    console.log('🔙 Current screen:', currentScreen);
+    console.log('🔙 Active filter:', activeFilter);
+    
+    if (currentScreen === 'search') {
+      // Go back to previous screen (home or filter)
+      if (activeFilter === 'All') {
+        console.log('🔙 Going back to HOME screen');
+        setCurrentScreen('home');
+      } else {
+        console.log('🔙 Going back to FILTER screen with filter:', activeFilter);
+        setCurrentScreen('filter');
+      }
+      setSearchTerm(''); // Clear search term
+      window.history.back();
+      
+      console.log('🔙 Navigation completed');
+    } else {
+      console.log('🔙 Not on search screen, current screen:', currentScreen);
+    }
+  }, [currentScreen, activeFilter]);
+
+  const getSearchResults = useCallback(() => {
+    if (!searchTerm.trim()) return [];
+    
+    return birthdays.filter((b) => {
+      const nameMatch = b.name?.toLowerCase().includes(searchTerm.toLowerCase().trim());
+      return nameMatch;
+    });
+  }, [birthdays, searchTerm]);
+
+  // 🔧 CRITICAL FIX: Set up real-time Firestore listener for cross-device sync
+  const setupRealTimeListener = useCallback(() => {
+    if (!user?.uid || listenerActive) {
+      console.log('🔔 Listener setup skipped:', { 
+        hasUser: !!user?.uid, 
+        listenerActive, 
+        userId: user?.uid 
+      });
+      return;
+    }
+
+    console.log('🔔 Setting up real-time birthday listener for user:', user.uid);
+    
+    try {
+      // Create reference to user's birthday subcollection
+      const birthdaysRef = collection(db, 'users', user.uid, 'birthdays');
+      console.log('📍 Collection reference created:', birthdaysRef.path);
+      
+      const q = query(birthdaysRef, orderBy('createdAt', 'desc'));
+      console.log('🔍 Query created with ordering');
+      
+      // Set up real-time listener
+      const unsubscribe = onSnapshot(q, 
+        (querySnapshot) => {
+          console.log('🔄 Real-time update received:', {
+            size: querySnapshot.size,
+            empty: querySnapshot.empty,
+            metadata: querySnapshot.metadata,
+            userId: user.uid
+          });
+          
+          const updatedBirthdays = [];
+          querySnapshot.forEach((doc) => {
+            const data = doc.data();
+            console.log('📄 Processing document:', { id: doc.id, data });
+            updatedBirthdays.push({
+              id: doc.id,
+              ...data,
+              createdAt: data.createdAt?.toDate?.() || data.createdAt,
+              updatedAt: data.updatedAt?.toDate?.() || data.updatedAt
+            });
+          });
+          
+          console.log('📊 Processed birthdays:', updatedBirthdays.length);
+          
+          // Update state with real-time data
+          setBirthdays(updatedBirthdays);
+          setLoading(false);
+          
+          console.log('✅ Real-time sync completed:', {
+            count: updatedBirthdays.length,
+            birthdays: updatedBirthdays.map(b => ({ id: b.id, name: b.name, date: b.date }))
+          });
+          
+          // Update sync status
+          setSyncStatus('synced');
+          setTimeout(() => setSyncStatus('idle'), 2000);
+          
+        },
+        (error) => {
+          console.error('❌ Real-time listener error:', error);
+          console.error('❌ Error details:', {
+            code: error.code,
+            message: error.message,
+            userId: user.uid,
+            collectionPath: `users/${user.uid}/birthdays`
+          });
+          setError(`Real-time sync failed: ${error.message}`);
+          setSyncStatus('error');
+          
+          // Fallback to cached data
+          console.log('🔄 Falling back to cached data due to listener error');
+          loadBirthdaysOptimized();
+        }
+      );
+      
+      setListenerActive(true);
+      console.log('✅ Real-time listener setup successful');
+      
+      // Return cleanup function
+      return unsubscribe;
+      
+    } catch (error) {
+      console.error('❌ Failed to setup real-time listener:', error);
+      console.error('❌ Setup error details:', {
+        error: error.message,
+        stack: error.stack,
+        userId: user.uid
+      });
+      setError(`Failed to setup real-time sync: ${error.message}`);
+      
+      // Fallback to cached data
+      console.log('🔄 Falling back to cached data due to setup error');
+      loadBirthdaysOptimized();
+    }
+  }, [user?.uid, loadBirthdaysOptimized]);
+
+  // Header control handlers
+  const handleSignOut = useCallback(async () => {
+    try {
+      console.log('Signing out...');
+      await signOut(auth);
+      console.log('Sign out successful');
+    } catch (error) {
+      console.error('Sign out error:', error);
+      alert('Failed to sign out. Please try again.');
+    }
+  }, []);
+
+  const openNotificationCenter = useCallback(() => {
+    setIsNotificationCenterOpen(true);
+  }, []);
+
+  const closeNotificationCenter = useCallback(() => {
+    setIsNotificationCenterOpen(false);
+  }, []);
+
+  const openProfile = useCallback(() => {
+    setIsProfileOpen(true);
+  }, []);
+
+  const closeProfile = useCallback(() => {
+    setIsProfileOpen(false);
+  }, []);
+
+  // 🔧 CRITICAL FIX: useEffect hooks AFTER all function definitions
+  // Load birthdays on component mount
+  useEffect(() => {
+    if (user?.uid) {
+      // 🔧 CRITICAL FIX: Setup real-time listener first, then fallback to cached data
+      const unsubscribe = setupRealTimeListener();
+      
+      // Fallback to cached data if real-time listener fails
+      if (!listenerActive) {
+        loadBirthdaysOptimized();
+      }
+      
+      checkPendingChanges();
+      checkProfileSetup();
+      
+      // Cleanup function
+      return () => {
+        if (unsubscribe) {
+          console.log('🧹 Cleaning up real-time listener');
+          unsubscribe();
+          setListenerActive(false);
+        }
+      };
+    }
+  }, [user?.uid, setupRealTimeListener, loadBirthdaysOptimized, checkPendingChanges, checkProfileSetup]);
 
   // Debug birthdays state changes
   useEffect(() => {
@@ -145,9 +492,9 @@ const Dashboard = ({ user, darkMode, setDarkMode }) => {
     );
 
     return cleanup;
-  }, [user?.uid]);
+  }, [user?.uid, handleSyncPendingChanges]);
 
-  // 🎯 NEW: Handle mobile back button
+  // Handle mobile back button
   useEffect(() => {
     const handlePopState = () => {
       if (currentScreen === 'filter') {
@@ -157,280 +504,16 @@ const Dashboard = ({ user, darkMode, setDarkMode }) => {
 
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, [currentScreen]);
+  }, [currentScreen, handleBackToHome]);
 
-  // 🎯 NEW: Debug screen changes
+  // Debug screen changes
   useEffect(() => {
     console.log('🔄 Screen changed to:', currentScreen);
     console.log('🔄 Active filter:', activeFilter);
     console.log('🔄 Search term:', searchTerm);
   }, [currentScreen, activeFilter, searchTerm]);
 
-  // Header control handlers
-  const handleSignOut = async () => {
-    try {
-      console.log('Signing out...');
-      await signOut(auth);
-      console.log('Sign out successful');
-    } catch (error) {
-      console.error('Sign out error:', error);
-      alert('Failed to sign out. Please try again.');
-    }
-  };
-
-  const openNotificationCenter = () => {
-    setIsNotificationCenterOpen(true);
-  };
-
-  const closeNotificationCenter = () => {
-    setIsNotificationCenterOpen(false);
-  };
-
-  const openProfile = () => {
-    setIsProfileOpen(true);
-  };
-
-  const closeProfile = () => {
-    setIsProfileOpen(false);
-  };
-
-  /**
-   * Load birthdays using optimized cached service
-   */
-  const loadBirthdaysOptimized = async (forceSync = false) => {
-    try {
-      if (forceSync) {
-        setRefreshing(true);
-        setSyncStatus('syncing');
-      } else {
-        setLoading(true);
-      }
-      
-      setError(null);
-      
-      console.log('📊 Loading birthdays (optimized) for user:', user.uid);
-      
-      const result = await getBirthdaysOptimized(user.uid, forceSync);
-      
-      setBirthdays(result.data);
-      setDataSource(result.fromCache ? 'cache' : 'server');
-      
-      // Update sync status
-      if (result.synced) {
-        setSyncStatus('synced');
-        setTimeout(() => setSyncStatus('idle'), 2000); // Reset after 2 seconds
-      } else if (result.syncError) {
-        setSyncStatus('error');
-      } else if (result.syncing) {
-        setSyncStatus('syncing');
-      } else {
-        setSyncStatus('idle');
-      }
-      
-      console.log('✅ Birthdays loaded (optimized):', {
-        count: result.data.length,
-        source: result.fromCache ? 'cache' : 'server',
-        syncing: result.syncing
-      });
-      
-    } catch (err) {
-      console.error('❌ Failed to load birthdays:', err);
-      setError(err.message);
-      setSyncStatus('error');
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
-
-  /**
-   * Check for pending changes in sync queue
-   */
-  const checkPendingChanges = () => {
-    if (user?.uid) {
-      const queue = getSyncQueue(user.uid); // Assuming getSyncQueue returns the queue
-      setPendingChanges(queue.length);
-    }
-  };
-
-  /**
-   * Sync pending changes manually
-   */
-  const handleSyncPendingChanges = async () => {
-    if (!user?.uid || !isOnline) return;
-
-    setSyncStatus('syncing');
-    
-    try {
-      const result = await syncPendingChanges(user.uid);
-      
-      if (result.success) {
-        console.log(`✅ Synced ${result.synced} pending changes`);
-        setSyncStatus('synced');
-        
-        // Refresh data from server to get latest
-        await loadBirthdaysOptimized(true);
-        checkPendingChanges();
-        
-        setTimeout(() => setSyncStatus('idle'), 2000);
-      } else {
-        setSyncStatus('error');
-      }
-    } catch (error) {
-      console.error('❌ Failed to sync pending changes:', error);
-      setSyncStatus('error');
-    }
-  };
-
-  /**
-   * Handle adding a new birthday
-   */
-  /**
- * Handle adding a new birthday - FIXED VERSION
- */
-const handleAddBirthday = (newBirthday) => {
-  console.log('🎂 Dashboard: New birthday added:', newBirthday);
-  console.log('🎂 Current birthdays count:', birthdays.length);
-  console.log('🎂 New birthday ID:', newBirthday?.id);
-  console.log('🎂 New birthday name:', newBirthday?.name);
-  
-  // CRITICAL FIX: Add the new birthday to local state immediately
-  if (newBirthday && newBirthday.id) {
-    setBirthdays(prevBirthdays => {
-      console.log('🎂 Previous birthdays count:', prevBirthdays.length);
-      
-      // Check if birthday already exists to avoid duplicates
-      const exists = prevBirthdays.find(b => b.id === newBirthday.id);
-      if (exists) {
-        console.log('🎂 Birthday already exists in state, updating...');
-        return prevBirthdays.map(b => b.id === newBirthday.id ? newBirthday : b);
-      } else {
-        console.log('🎂 Adding new birthday to state...');
-        const updatedBirthdays = [newBirthday, ...prevBirthdays];
-        console.log('🎂 Updated birthdays count:', updatedBirthdays.length);
-        return updatedBirthdays;
-      }
-    });
-  } else {
-    console.error('❌ Invalid birthday data received:', newBirthday);
-  }
-  
-  // Close the modal
-  setShowModal(false);
-  
-  // Check for pending changes
-  checkPendingChanges();
-  
-  // CRITICAL FIX: Force refresh from cache to ensure consistency
-  setTimeout(() => {
-    console.log('🎂 Refreshing birthdays from cache...');
-    loadBirthdaysOptimized(false); // false = don't force server sync
-  }, 100);
-};
-
-  /**
-   * Handle refreshing data
-   */
-  const handleRefresh = () => {
-    loadBirthdaysOptimized(true);
-  };
-
-  /**
-   * Handle clicking on stat cards to show filtered lists
-   */
-  const handleStatCardClick = (filterType) => {
-    setActiveFilter(filterType);
-    setSelectedFilter(filterType);
-    setCurrentScreen('filter'); // Switch to filter screen
-    
-    // 🎯 NEW: Push to browser history for mobile back button support
-    window.history.pushState({ filter: filterType }, '', `#${filterType.toLowerCase().replace(' ', '-')}`);
-  };
-
-  /**
-   * Handle back navigation to home screen
-   */
-  const handleBackToHome = () => {
-    setCurrentScreen('home');
-    setSelectedFilter('All');
-    setActiveFilter('All');
-    
-    // 🎯 NEW: Go back in browser history
-    window.history.back();
-  };
-
-  /**
-   * 🎯 NEW: Handle search screen navigation
-   */
-  const handleSearchClick = () => {
-    console.log('🔍 Search bar clicked! Navigating to search screen...');
-    console.log('🔍 Current screen before:', currentScreen);
-    console.log('🔍 Current search term:', searchTerm);
-    console.log('🔍 Function called successfully');
-    
-    try {
-      setCurrentScreen('search');
-      setSearchTerm(''); // Clear search term when opening search screen
-      
-      // Push to browser history for back button support
-      window.history.pushState({ screen: 'search' }, '', '#search');
-      
-      console.log('🔍 Screen changed to:', 'search');
-      console.log('🔍 Search term cleared');
-      console.log('🔍 History state pushed');
-      
-      // Force a re-render to ensure the screen changes
-      setTimeout(() => {
-        console.log('🔍 After timeout - Current screen:', currentScreen);
-        console.log('🔍 After timeout - Search term:', searchTerm);
-      }, 100);
-      
-    } catch (error) {
-      console.error('❌ Error in handleSearchClick:', error);
-    }
-  };
-
-  /**
-   * 🎯 NEW: Handle back from search screen
-   */
-  const handleBackFromSearch = () => {
-    console.log('🔙 Back button clicked from search screen');
-    console.log('🔙 Current screen:', currentScreen);
-    console.log('🔙 Active filter:', activeFilter);
-    
-    if (currentScreen === 'search') {
-      // Go back to previous screen (home or filter)
-      if (activeFilter === 'All') {
-        console.log('🔙 Going back to HOME screen');
-        setCurrentScreen('home');
-      } else {
-        console.log('🔙 Going back to FILTER screen with filter:', activeFilter);
-        setCurrentScreen('filter');
-      }
-      setSearchTerm(''); // Clear search term
-      window.history.back();
-      
-      console.log('🔙 Navigation completed');
-    } else {
-      console.log('🔙 Not on search screen, current screen:', currentScreen);
-    }
-  };
-
-  /**
-   * 🎯 NEW: Get search results from ALL birthdays
-   */
-  const getSearchResults = () => {
-    if (!searchTerm.trim()) return [];
-    
-    return birthdays.filter((b) => {
-      const nameMatch = b.name?.toLowerCase().includes(searchTerm.toLowerCase().trim());
-      return nameMatch;
-    });
-  };
-
-  /**
-   * Filter birthdays based on selected filter and search term
-   */
+  // Filter birthdays based on selected filter and search term
   const filteredBirthdays = birthdays.filter((b) => {
     const nameMatch = b.name?.toLowerCase().includes(searchTerm.toLowerCase());
     const today = new Date();
@@ -453,7 +536,7 @@ const handleAddBirthday = (newBirthday) => {
     }
   });
 
-  // Debug filtered birthdays - moved here after filteredBirthdays is defined
+  // Debug filtered birthdays
   useEffect(() => {
     console.log('🎂 Dashboard filtered birthdays:', {
       count: filteredBirthdays.length,
@@ -583,7 +666,7 @@ const handleAddBirthday = (newBirthday) => {
                   <h1 className="text-lg md:text-xl font-bold bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent">
                     Celefy
                   </h1>
-                  <p className="text-xs md:text-sm text-gray-600 dark:text-gray-400">
+                  <p className="text-xsphew text-gray-600 dark:text-gray-400">
                     celebrate every special moment
                   </p>
                 </div>
@@ -622,6 +705,33 @@ const handleAddBirthday = (newBirthday) => {
                     </span>
                   </div>
                 </button>
+
+                {/* 🔧 DEBUG: Test Real-Time Listener Button */}
+                <button
+                  onClick={() => {
+                    console.log('🧪 Testing real-time listener...');
+                    if (listenerActive) {
+                      console.log('✅ Real-time listener is active');
+                    } else {
+                      console.log('❌ Real-time listener is not active');
+                      setupRealTimeListener();
+                    }
+                  }}
+                  className="p-2 md:p-3 text-gray-600 dark:text-gray-400 hover:text-green-600 dark:hover:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-xl transition-all duration-200"
+                  title="Test Real-Time Sync"
+                >
+                  <div className="w-4 h-4 md:w-5 md:h-5 bg-gradient-to-r from-green-400 to-green-600 rounded-full flex items-center justify-center">
+                    <span className="text-white text-xs font-bold">🧪</span>
+                  </div>
+                </button>
+
+                {/* 🔄 Real-Time Sync Status Indicator */}
+                <div className="flex items-center space-x-1">
+                  <div className={`w-2 h-2 rounded-full ${listenerActive ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                    {listenerActive ? 'Live' : 'Offline'}
+                  </span>
+                </div>
               </div>
             </div>
             

@@ -279,7 +279,6 @@ export const syncNotificationsWithFirestore = async (userId) => {
     const q = query(
       notificationsRef,
       where('userId', '==', userId),
-      orderBy('timestamp', 'desc'),
       limit(100)
     );
     

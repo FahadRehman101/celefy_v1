@@ -119,7 +119,7 @@ class ErrorBoundary extends React.Component {
               </Button>
             </div>
 
-            {process.env.NODE_ENV === 'development' && this.state.errorInfo && (
+            {typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'development' && this.state.errorInfo && (
               <details className="mt-4 text-xs">
                 <summary className="cursor-pointer text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200">
                   Show error details (dev only)

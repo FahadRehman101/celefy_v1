@@ -174,14 +174,6 @@ export const initializeOneSignal = async () => {
         }
       },
       
-      notifyButton: {
-        enable: true,
-        position: 'bottom-right',
-        size: 'medium',
-        theme: 'default',
-        showCredit: false
-      },
-      
       welcomeNotification: {
         title: "Welcome to Celefy! 🎉",
         message: "You'll now receive birthday reminders!",

@@ -11,10 +11,36 @@ import {
     serverTimestamp
   } from 'firebase/firestore';
   import { db } from '@/config/firebase';
-  
+  import { validateEnvironment } from '@/config/environment';
+  // Validate environment on module load
+const envCheck = validateEnvironment();
+if (!envCheck.valid) {
+  console.error('🔧 Environment configuration required:', envCheck.missing);
+}
+
+export const secureOperation = async (operation, fallback = null) => {
+  try {
+    return await operation();
+  } catch (error) {
+    console.error('🔒 Secure operation failed:', error);
+    
+    // Don't expose sensitive error details to user
+    if (error.code === 'permission-denied') {
+      throw new Error('Access denied. Please check your permissions.');
+    }
+    
+    if (error.code === 'unauthenticated') {
+      throw new Error('Authentication required. Please sign in.');
+    }
+    
+    // Generic error for other cases
+    throw new Error('Operation failed. Please try again.');
+  }
+};
   /**
    * Firestore service for birthday management
-   * Using flat collection structure: birthdays (with userId field)
+   * 🔧 CRITICAL FIX: Using subcollection structure: users/{userId}/birthdays
+   * This matches the structure used in birthdayService.js
    */
   
   // Collection references
@@ -31,10 +57,11 @@ import {
     try {
       console.log('🔥 Adding birthday to Firestore:', birthdayData);
       
-      const birthdaysRef = collection(db, BIRTHDAYS_COLLECTION);
+      // 🔧 CRITICAL FIX: Use subcollection structure to match birthdayService.js
+      const birthdaysRef = collection(db, USERS_COLLECTION, userId, BIRTHDAYS_COLLECTION);
       const docData = {
         ...birthdayData,
-        userId: userId, // Add userId field to document
+        userId: userId, // Keep userId field for compatibility
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       };
@@ -58,12 +85,10 @@ import {
     try {
       console.log('🔥 Fetching birthdays from Firestore for user:', userId);
       
-      const birthdaysRef = collection(db, BIRTHDAYS_COLLECTION);
-      // Removed orderBy to avoid index requirement - will sort in JavaScript instead
-      const q = query(
-        birthdaysRef, 
-        where('userId', '==', userId)
-      );
+      // 🔧 CRITICAL FIX: Use subcollection structure to match birthdayService.js
+      const birthdaysRef = collection(db, USERS_COLLECTION, userId, BIRTHDAYS_COLLECTION);
+      // No need for userId filter since we're already in the user's subcollection
+      const q = query(birthdaysRef);
       
       const querySnapshot = await getDocs(q);
       const birthdays = [];
@@ -105,7 +130,8 @@ import {
     try {
       console.log('🔥 Updating birthday:', birthdayId);
       
-      const birthdayRef = doc(db, BIRTHDAYS_COLLECTION, birthdayId);
+      // 🔧 CRITICAL FIX: Use subcollection structure to match birthdayService.js
+      const birthdayRef = doc(db, USERS_COLLECTION, userId, BIRTHDAYS_COLLECTION, birthdayId);
       const docData = {
         ...updateData,
         userId: userId, // Ensure userId is maintained
@@ -130,7 +156,8 @@ import {
     try {
       console.log('🔥 Deleting birthday:', birthdayId);
       
-      const birthdayRef = doc(db, BIRTHDAYS_COLLECTION, birthdayId);
+      // 🔧 CRITICAL FIX: Use subcollection structure to match birthdayService.js
+      const birthdayRef = doc(db, USERS_COLLECTION, userId, BIRTHDAYS_COLLECTION, birthdayId);
       await deleteDoc(birthdayRef);
       
       console.log('✅ Birthday deleted successfully');
@@ -172,12 +199,12 @@ import {
     try {
       console.log('🔍 Debugging user data for:', userId);
       
-      // Check birthdays with current structure
-      const birthdaysRef = collection(db, BIRTHDAYS_COLLECTION);
-      const q = query(birthdaysRef, where('userId', '==', userId));
+      // 🔧 CRITICAL FIX: Use subcollection structure to match birthdayService.js
+      const birthdaysRef = collection(db, USERS_COLLECTION, userId, BIRTHDAYS_COLLECTION);
+      const q = query(birthdaysRef);
       const birthdaysSnapshot = await getDocs(q);
       
-      console.log('Birthdays collection path:', `birthdays (filtered by userId: ${userId})`);
+      console.log('Birthdays collection path:', `users/${userId}/birthdays (subcollection)`);
       console.log('Birthdays found:', birthdaysSnapshot.size);
       
       const birthdays = [];
