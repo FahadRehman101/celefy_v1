@@ -4,6 +4,7 @@ import ReactDOM from 'react-dom/client';
 import App from './App';
 import './index.css';
 import { initializeOneSignal, checkSubscriptionStatus, requestPermission } from './config/onesignal';
+import { AuthProvider } from './hooks/useAuth';
 
 const registerServiceWorkers = async () => {
   if ('serviceWorker' in navigator) {
@@ -110,7 +111,9 @@ const renderApp = () => {
   try {
     ReactDOM.createRoot(document.getElementById('root')).render(
       <React.StrictMode>
-        <App />
+        <AuthProvider>
+          <App />
+        </AuthProvider>
       </React.StrictMode>,
     );
   } catch (error) {

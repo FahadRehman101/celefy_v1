@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/config/firebase';
 import { Gift } from 'lucide-react';
+// OneSignal import removed - initialization handled in main.jsx
 
 import BirthdayNotificationPrompt from '@/components/notifications/BirthdayNotificationPrompt';
 import NotificationPermissionModal from '@/components/notifications/NotificationPermissionModal';
@@ -27,6 +28,9 @@ import {
 } from '@/utils/placeholders';
 
 const App = () => {
+  // OneSignal is now initialized in main.jsx to prevent conflicts
+  // This useEffect removed to prevent double initialization
+
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState(null);

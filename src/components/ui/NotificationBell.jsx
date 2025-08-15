@@ -3,9 +3,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { Bell } from 'lucide-react';
-import { getUnreadNotificationCount } from '@/services/notificationHistory';
+import { getUnreadNotificationCount, syncNotificationsWithFirestore } from '@/services/enhancedNotificationService';
 
-const NotificationBell = ({ onClick, className = '' }) => {
+const NotificationBell = ({ onClick, className = '', userId }) => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [isAnimating, setIsAnimating] = useState(false);
 
@@ -18,6 +18,13 @@ const NotificationBell = ({ onClick, className = '' }) => {
 
     // Initial count
     updateCount();
+
+    // CRITICAL FIX: Sync with Firestore for cross-device consistency
+    if (userId) {
+      syncNotificationsWithFirestore(userId).then(() => {
+        updateCount(); // Update count after sync
+      });
+    }
 
     // Update every 30 seconds
     const interval = setInterval(updateCount, 30000);
@@ -35,7 +42,7 @@ const NotificationBell = ({ onClick, className = '' }) => {
       clearInterval(interval);
       window.removeEventListener('storage', handleStorageChange);
     };
-  }, []);
+  }, [userId]);
 
   // Animate when count changes
   useEffect(() => {

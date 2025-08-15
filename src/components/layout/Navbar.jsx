@@ -1,12 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import { Menu, X, Sun, Moon, User, LogOut } from 'lucide-react';
 import NotificationBell from '@/components/ui/NotificationBell';
 import NotificationCenter from '@/components/ui/NotificationCenter';
+import { useAuth } from '@/hooks/useAuth';
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isNotificationCenterOpen, setIsNotificationCenterOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
+  
+  // Get current user for notifications
+  const { user } = useAuth();
 
   const toggleTheme = () => {
     setIsDarkMode(!isDarkMode);
@@ -49,16 +53,14 @@ const Navbar = () => {
                 )}
               </button>
 
-              {/* 🎯 NEW: Notification Bell */}
-              <div className="relative z-10 bg-blue-100 dark:bg-blue-900 p-1 rounded">
-                <button 
+              {/* 🎯 ENHANCED: Notification Bell with Firestore Integration */}
+              {user && (
+                <NotificationBell 
                   onClick={openNotificationCenter}
-                  className="p-2 rounded-full bg-red-500 text-white hover:bg-red-600 transition-colors"
-                  aria-label="Test Notifications"
-                >
-                  🔔 TEST
-                </button>
-              </div>
+                  userId={user.uid}
+                  className="relative z-10"
+                />
+              )}
 
               {/* User Menu */}
               <div className="flex items-center space-x-3">
@@ -91,11 +93,14 @@ const Navbar = () => {
         </div>
       </nav>
 
-      {/* 🎯 NEW: Notification Center Modal */}
-      <NotificationCenter 
-        isOpen={isNotificationCenterOpen}
-        onClose={closeNotificationCenter}
-      />
+      {/* 🎯 ENHANCED: Notification Center Modal with Firestore Integration */}
+      {user && (
+        <NotificationCenter 
+          isOpen={isNotificationCenterOpen}
+          onClose={closeNotificationCenter}
+          userId={user.uid}
+        />
+      )}
     </>
   );
 };

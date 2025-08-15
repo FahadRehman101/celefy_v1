@@ -21,6 +21,7 @@ import {
   removeFromSyncQueue,
   cacheUserProfile
 } from './localStorage';
+import { cancelScheduledNotifications } from './notificationScheduler';
   
   /**
    * Enhanced Firestore service with localStorage caching
@@ -291,6 +292,9 @@ import {
     // Try to sync to server
     if (isOnline()) {
       try {
+        console.log('Canceling notifications for birthday:', birthdayId);
+        await cancelScheduledNotifications(birthdayId);
+        
         const birthdayRef = doc(db, BIRTHDAYS_COLLECTION, birthdayId);
         await deleteDoc(birthdayRef);
         

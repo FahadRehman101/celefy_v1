@@ -31,7 +31,7 @@ const BirthdayList = ({ birthdays = [], onRefresh, loading = false, userId, onDa
   const handleDelete = async (birthday) => {
     setDeleting(true);
     try {
-      console.log('🗑️ Deleting birthday (optimized):', birthday.id);
+      console.log('Starting delete process for:', birthday.name);
       
       // Use optimized delete (instant cache removal + background sync)
       await deleteBirthdayOptimized(userId, birthday.id);

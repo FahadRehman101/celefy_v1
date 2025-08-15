@@ -1,3 +1,5 @@
+importScripts('https://cdn.onesignal.com/sdks/OneSignalSDKWorker.js');
+
 // Service Worker for Celefy - Focus on caching, let OneSignal handle push notifications
 const CACHE_NAME = 'celefy-v1';
 const urlsToCache = [
@@ -49,4 +51,50 @@ self.addEventListener('activate', (event) => {
       );
     })
   );
+});
+
+self.addEventListener('notificationclick', function(event) {
+  event.notification.close();
+  
+  // Enhanced PC compatibility - try multiple approaches
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true })
+      .then(function(clientList) {
+        // Try to focus existing window first
+        for (let i = 0; i < clientList.length; i++) {
+          const client = clientList[i];
+          if (client.url.includes('celefy') && 'focus' in client) {
+            return client.focus();
+          }
+        }
+        
+        // If no existing window, open new one
+        if (clients.openWindow) {
+          return clients.openWindow('https://celefy.netlify.app');
+        }
+        
+        // Fallback for older browsers
+        return clients.openWindow('/');
+      })
+  );
+});
+
+// CRITICAL FIX: Handle incoming push notifications
+self.addEventListener('push', function(event) {
+  console.log('🔔 Push notification received in service worker:', event);
+  
+  if (event.data) {
+    try {
+      const notificationData = event.data.json();
+      console.log('📱 Processing push notification:', notificationData);
+      
+      // Store notification data for the app to process
+      event.waitUntil(
+        // You can add additional processing here if needed
+        Promise.resolve()
+      );
+    } catch (error) {
+      console.error('❌ Failed to process push notification:', error);
+    }
+  }
 });

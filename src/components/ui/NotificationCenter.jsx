@@ -13,20 +13,40 @@ import {
   formatNotificationTime,
   getNotificationIcon,
   getNotificationColor,
-  NOTIFICATION_TYPES
-} from '@/services/notificationHistory';
+  NOTIFICATION_TYPES,
+  getNotificationsWithRealtime
+} from '@/services/enhancedNotificationService';
 
-const NotificationCenter = ({ isOpen, onClose }) => {
+const NotificationCenter = ({ isOpen, onClose, userId }) => {
   const [notifications, setNotifications] = useState([]);
   const [filter, setFilter] = useState('all'); // 'all', 'unread', 'read'
   const [isLoading, setIsLoading] = useState(false);
+  const [unsubscribe, setUnsubscribe] = useState(null);
 
   // Load notifications when modal opens
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && userId) {
+      // CRITICAL FIX: Set up real-time listener for live updates
+      const unsubscribeRealtime = getNotificationsWithRealtime(userId, (updatedNotifications) => {
+        setNotifications(updatedNotifications);
+      });
+      
+      if (unsubscribeRealtime) {
+        setUnsubscribe(() => unsubscribeRealtime);
+      }
+      
+      // Also load initial notifications
       loadNotifications();
     }
-  }, [isOpen, filter]);
+    
+    return () => {
+      // Clean up real-time listener when modal closes
+      if (unsubscribe) {
+        unsubscribe();
+        setUnsubscribe(null);
+      }
+    };
+  }, [isOpen, filter, userId]);
 
   const loadNotifications = () => {
     setIsLoading(true);
@@ -50,7 +70,7 @@ const NotificationCenter = ({ isOpen, onClose }) => {
 
   const handleMarkAsRead = async (notificationId) => {
     try {
-      const success = markNotificationAsRead(notificationId);
+      const success = await markNotificationAsRead(notificationId, userId);
       if (success) {
         setNotifications(prev => 
           prev.map(n => 
@@ -65,7 +85,7 @@ const NotificationCenter = ({ isOpen, onClose }) => {
 
   const handleMarkAllAsRead = async () => {
     try {
-      const success = markAllNotificationsAsRead();
+      const success = await markAllNotificationsAsRead(userId);
       if (success) {
         setNotifications(prev => prev.map(n => ({ ...n, read: true })));
       }
@@ -76,7 +96,7 @@ const NotificationCenter = ({ isOpen, onClose }) => {
 
   const handleDelete = async (notificationId) => {
     try {
-      const success = deleteNotification(notificationId);
+      const success = await deleteNotification(notificationId, userId);
       if (success) {
         setNotifications(prev => prev.filter(n => n.id !== notificationId));
       }
@@ -88,7 +108,7 @@ const NotificationCenter = ({ isOpen, onClose }) => {
   const handleClearAll = async () => {
     if (window.confirm('Are you sure you want to clear all notifications?')) {
       try {
-        const success = clearAllNotifications();
+        const success = await clearAllNotifications(userId);
         if (success) {
           setNotifications([]);
         }
