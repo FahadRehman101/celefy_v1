@@ -27,38 +27,8 @@ export const mockBirthdays = [
   }
 ];
 
-export const mockCelebrityBirthdays = [
-  {
-    id: 'c1',
-    name: 'Tom Brady',
-    date: 'August 3, 1977',
-    bio: 'American football quarterback and considered the greatest NFL player of all time.',
-    image: '🏈'
-  },
-  {
-    id: 'c2',
-    name: 'Martha Stewart',
-    date: 'August 3, 1941',
-    bio: 'American retail businesswoman, writer, and television personality.',
-    image: '📺'
-  }
-];
+// REMOVED: mockCelebrityBirthdays - Celebrities function removed
+// export const mockCelebrityBirthdays = [...];
 
-export const mockStories = [
-  {
-    id: 1,
-    title: 'The Cake Explosion 🎂💥',
-    story: 'I once dropped an entire chocolate cake on my friend’s lap while singing happy birthday.',
-    author: 'Fahad',
-    date: '2025-08-01',
-    likes: 4
-  },
-  {
-    id: 2,
-    title: 'Surprise Gone Wrong 😬',
-    story: 'Tried to surprise my sister but ended up jumping out too early and scared the dog instead!',
-    author: 'Fatima',
-    date: '2025-08-02',
-    likes: 7
-  }
-];
+// REMOVED: mockStories - Moved to future implementation guide
+// export const mockStories = [...];

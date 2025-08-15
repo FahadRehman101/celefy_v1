@@ -15,6 +15,14 @@ export const AuthProvider = ({ children }) => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setUser(user);
       setLoading(false);
+      
+      // CRITICAL FIX: Make user ID available globally for notification service
+      if (user) {
+        window.currentUser = user;
+        console.log('✅ User ID made available globally:', user.uid);
+      } else {
+        window.currentUser = null;
+      }
     });
 
     return () => unsubscribe();

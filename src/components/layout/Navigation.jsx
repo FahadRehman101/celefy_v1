@@ -78,63 +78,53 @@ const Navigation = ({ user, currentPage, setCurrentPage, darkMode, setDarkMode }
 
   return (
     <>
-      <nav className="bg-white/80 backdrop-blur-md border-b border-pink-200 px-4 py-3 flex justify-between items-center shadow-sm">
-        <div className="flex items-center space-x-4">
+      <nav className="bg-white/80 backdrop-blur-md border-b border-pink-200 px-2 sm:px-4 py-3 flex justify-between items-center shadow-sm">
+        <div className="flex items-center space-x-2 sm:space-x-4">
           <div className="flex items-center space-x-2 cursor-pointer" onClick={() => setCurrentPage('dashboard')}>
-            <div className="bg-gradient-to-r from-pink-500 to-purple-600 p-2 rounded-xl">
-              <Home className="text-white w-5 h-5" />
+            <div className="bg-gradient-to-r from-pink-500 to-purple-600 p-1.5 sm:p-2 rounded-xl">
+              <Home className="text-white w-4 h-4 sm:w-5 sm:h-5" />
             </div>
-            <span className="text-lg font-bold bg-gradient-to-r from-pink-500 to-purple-600 text-transparent bg-clip-text">
+            <span className="text-base sm:text-lg font-bold bg-gradient-to-r from-pink-500 to-purple-600 text-transparent bg-clip-text">
               Celefy
             </span>
           </div>
           
           <button
             onClick={() => setCurrentPage('dashboard')}
-            className={`ml-6 text-sm font-medium ${currentPage === 'dashboard' ? 'text-pink-600' : 'text-gray-600 hover:text-pink-600'}`}
+            className={`ml-2 sm:ml-6 text-xs sm:text-sm font-medium px-2 py-1 rounded-lg transition-colors ${currentPage === 'dashboard' ? 'text-pink-600 bg-pink-50' : 'text-gray-600 hover:text-pink-600 hover:bg-pink-50'}`}
           >
             Dashboard
           </button>
-          <button
-            onClick={() => setCurrentPage('celebrities')}
-            className={`text-sm font-medium ${currentPage === 'celebrities' ? 'text-pink-600' : 'text-gray-600 hover:text-pink-600'}`}
-          >
-            Celebrities
-          </button>
-          <button
-            onClick={() => setCurrentPage('stories')}
-            className={`text-sm font-medium ${currentPage === 'stories' ? 'text-pink-600' : 'text-gray-600 hover:text-pink-600'}`}
-          >
-            Stories
-          </button>
+          {/* REMOVED: Celebrities function - Button removed */}
+          {/* REMOVED: Stories function - Moved to future implementation guide */}
         </div>
 
-        <div className="flex items-center space-x-4">
-          <button onClick={() => setDarkMode(!darkMode)}>
-            {darkMode ? <Sun className="w-5 h-5 text-yellow-400" /> : <Moon className="w-5 h-5 text-gray-600" />}
+        <div className="flex items-center space-x-2 sm:space-x-4">
+          <button onClick={() => setDarkMode(!darkMode)} className="p-2 rounded-lg hover:bg-gray-100 transition-colors">
+            {darkMode ? <Sun className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-400" /> : <Moon className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600" />}
           </button>
           
           {/* 🎯 NEW: Notification Bell */}
           <NotificationBell 
             onClick={openNotificationCenter}
-            className="ml-2"
+            className="ml-1 sm:ml-2"
           />
           
-          {/* User Info */}
-          <div className="w-8 h-8 bg-gradient-to-r from-pink-500 to-purple-500 text-white rounded-full flex items-center justify-center font-semibold">
+          {/* User Info - Hidden on very small screens */}
+          <div className="hidden sm:flex w-8 h-8 bg-gradient-to-r from-pink-500 to-purple-500 text-white rounded-full items-center justify-center font-semibold">
             {getAvatarLetter()}
           </div>
           
-          {/* Editable User Name */}
+          {/* Editable User Name - Responsive */}
           {isEditingName ? (
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-1 sm:space-x-2">
               <input
                 type="text"
                 value={tempUserName}
                 onChange={(e) => setTempUserName(e.target.value)}
                 onKeyDown={handleKeyPress}
-                className="px-2 py-1 text-sm border border-pink-300 rounded-md focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-                placeholder="Enter your name"
+                className="px-2 py-1 text-xs sm:text-sm border border-pink-300 rounded-md focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent w-20 sm:w-auto"
+                placeholder="Name"
                 autoFocus
               />
               <button
@@ -142,19 +132,19 @@ const Navigation = ({ user, currentPage, setCurrentPage, darkMode, setDarkMode }
                 className="p-1 text-green-600 hover:text-green-700 hover:bg-green-50 rounded transition-colors"
                 title="Save name"
               >
-                <Check className="w-4 h-4" />
+                <Check className="w-3 h-3 sm:w-4 sm:h-4" />
               </button>
               <button
                 onClick={cancelEditing}
                 className="p-1 text-red-600 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
                 title="Cancel"
               >
-                <X className="w-4 h-4" />
+                <X className="w-3 h-3 sm:w-4 sm:h-4" />
               </button>
             </div>
           ) : (
-            <div className="flex items-center space-x-2 group">
-              <span className="text-sm font-medium text-gray-700 max-w-32 truncate">
+            <div className="flex items-center space-x-1 sm:space-x-2 group">
+              <span className="text-xs sm:text-sm font-medium text-gray-700 max-w-20 sm:max-w-32 truncate hidden sm:block">
                 {getDisplayName()}
               </span>
               <button
@@ -162,7 +152,7 @@ const Navigation = ({ user, currentPage, setCurrentPage, darkMode, setDarkMode }
                 className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded opacity-0 group-hover:opacity-100 transition-all duration-200"
                 title="Edit name"
               >
-                <Edit2 className="w-3 h-3" />
+                <Edit2 className="w-3 h-3 sm:w-4 sm:h-4" />
               </button>
             </div>
           )}
@@ -173,7 +163,7 @@ const Navigation = ({ user, currentPage, setCurrentPage, darkMode, setDarkMode }
             className="text-gray-600 hover:text-red-500 transition-colors p-1 rounded-lg hover:bg-red-50"
             title="Sign Out"
           >
-            <LogOut className="w-5 h-5" />
+            <LogOut className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
         </div>
       </nav>

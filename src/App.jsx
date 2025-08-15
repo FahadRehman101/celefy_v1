@@ -14,17 +14,15 @@ import ErrorBoundary from '@/components/ui/ErrorBoundary';
 
 import Login from '@/pages/Login';
 import Dashboard from '@/pages/Dashboard';
-import CelebrityBirthdays from '@/pages/CelebrityBirthdays';
-import Stories from '@/pages/Stories';
+// REMOVED: CelebrityBirthdays import - Celebrities function removed
+// REMOVED: Stories import - Moved to future implementation guide
 
 import OnboardingModal from '@/components/onboarding/OnboardingModal';
 import Navigation from '@/components/layout/Navigation';
 import PWAInstallPrompt from '@/components/PWAInstallPrompt';
 
 import {
-  mockBirthdays,
-  mockCelebrityBirthdays,
-  mockStories
+  mockBirthdays
 } from '@/utils/placeholders';
 
 const App = () => {
@@ -193,13 +191,7 @@ const App = () => {
           </ErrorBoundary>
         ) : (
           <ErrorBoundary>
-            <Navigation 
-              currentPage={currentPage}
-              setCurrentPage={setCurrentPage}
-              darkMode={darkMode}
-              setDarkMode={toggleDarkMode}
-              user={user}
-            />
+            {/* REMOVED: Top Navigation Header - Moved to main content area */}
             
             <main className="pb-20">
               {/* Page content based on currentPage */}
@@ -208,25 +200,12 @@ const App = () => {
                   <Dashboard 
                     user={user}
                     darkMode={darkMode}
+                    setDarkMode={toggleDarkMode}
                   />
                 </ErrorBoundary>
               )}
-              {currentPage === 'celebrity' && (
-                <ErrorBoundary>
-                  <CelebrityBirthdays 
-                    birthdays={mockCelebrityBirthdays}
-                    darkMode={darkMode}
-                  />
-                </ErrorBoundary>
-              )}
-              {currentPage === 'stories' && (
-                <ErrorBoundary>
-                  <Stories 
-                    stories={mockStories}
-                    darkMode={darkMode}
-                  />
-                </ErrorBoundary>
-              )}
+              {/* REMOVED: Celebrity page - Celebrities function removed */}
+              {/* REMOVED: Stories page - Moved to future implementation guide */}
             </main>
           </ErrorBoundary>
         )}

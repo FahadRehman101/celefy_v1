@@ -212,6 +212,104 @@ export const initializeOneSignal = async () => {
           // This will be handled by the notification service
         });
         
+        // CRITICAL FIX: Listen for incoming push notifications
+        window.OneSignal.Notifications.addEventListener('foregroundWillDisplay', (event) => {
+          console.log('🔔 Push notification received in foreground:', event);
+          // Prevent default display and handle manually
+          event.preventDefault();
+          
+          // Get notification data
+          const notification = event.notification;
+          console.log('📱 Processing incoming push notification:', notification);
+          
+          // Import and call our enhanced service
+          import('@/services/enhancedNotificationService').then(({ handleIncomingPushNotification }) => {
+            // Get current user ID from auth context
+            const currentUser = window.currentUser || null;
+            if (currentUser && currentUser.uid) {
+              handleIncomingPushNotification(notification, currentUser.uid);
+              console.log('✅ Push notification captured and saved to Firestore');
+            } else {
+              console.warn('⚠️ No user ID available for notification capture');
+            }
+          }).catch(error => {
+            console.error('❌ Failed to import enhanced service:', error);
+          });
+        });
+        
+        // CRITICAL FIX: Handle background push notifications
+        window.OneSignal.Notifications.addEventListener('click', (event) => {
+          console.log('🔔 Push notification clicked:', event);
+          
+          // Get notification data and save it if not already saved
+          const notification = event.notification;
+          if (notification && !notification.data?.savedToFirestore) {
+            import('@/services/enhancedNotificationService').then(({ handleIncomingPushNotification }) => {
+              const currentUser = window.currentUser || null;
+              if (currentUser && currentUser.uid) {
+                handleIncomingPushNotification(notification, currentUser.uid);
+                console.log('✅ Background push notification captured and saved to Firestore');
+              }
+            }).catch(error => {
+              console.error('❌ Failed to import enhanced service for background notification:', error);
+            });
+          }
+        });
+        
+        // CRITICAL FIX: Handle background push notifications when app is closed
+        window.OneSignal.Notifications.addEventListener('permissionChange', (event) => {
+          console.log('🔐 Notification permission changed:', event);
+        });
+        
+        // CRITICAL FIX: Set up background notification handler
+        if (window.OneSignal.Notifications.setDefaultNotificationUrl) {
+          window.OneSignal.Notifications.setDefaultNotificationUrl('https://celefy.netlify.app');
+        }
+        
+        // CRITICAL FIX: Handle notification display when app is in background
+        window.OneSignal.Notifications.addEventListener('foregroundWillDisplay', (event) => {
+          console.log('🔔 Foreground notification will display:', event);
+        });
+        
+        // CRITICAL FIX: Handle notification display when app is in background
+        window.OneSignal.Notifications.addEventListener('foregroundDidDisplay', (event) => {
+          console.log('🔔 Foreground notification did display:', event);
+        });
+        
+        // CRITICAL FIX: Enhanced mobile push reliability
+        if (window.OneSignal.Notifications.setDefaultNotificationUrl) {
+          window.OneSignal.Notifications.setDefaultNotificationUrl('https://celefy.netlify.app');
+        }
+        
+        // CRITICAL FIX: Set up mobile-specific notification handling
+        if (window.OneSignal.Notifications.setDefaultTitle) {
+          window.OneSignal.Notifications.setDefaultTitle('Celefy');
+        }
+        
+        // CRITICAL FIX: Mobile notification permission persistence
+        if (window.OneSignal.Notifications.permission) {
+          console.log('📱 Current notification permission:', window.OneSignal.Notifications.permission);
+        }
+        
+        // CRITICAL FIX: Mobile notification delivery confirmation
+        window.OneSignal.Notifications.addEventListener('click', (event) => {
+          console.log('🔔 Mobile notification clicked:', event);
+          
+          // Ensure notification is saved to Firestore
+          const notification = event.notification;
+          if (notification) {
+            import('@/services/enhancedNotificationService').then(({ handleIncomingPushNotification }) => {
+              const currentUser = window.currentUser || null;
+              if (currentUser && currentUser.uid) {
+                handleIncomingPushNotification(notification, currentUser.uid);
+                console.log('✅ Mobile notification captured and saved to Firestore');
+              }
+            }).catch(error => {
+              console.error('❌ Failed to save mobile notification:', error);
+            });
+          }
+        });
+        
         // Listen for notification permission changes
         window.OneSignal.User.PushSubscription.addEventListener('change', (event) => {
           console.log('🔐 Push subscription changed:', event);

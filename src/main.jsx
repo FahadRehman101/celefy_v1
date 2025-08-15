@@ -116,6 +116,84 @@ const renderApp = () => {
         </AuthProvider>
       </React.StrictMode>,
     );
+    
+    // CRITICAL FIX: Listen for service worker messages to capture push notifications
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('message', function(event) {
+        if (event.data && event.data.type === 'PUSH_NOTIFICATION_RECEIVED') {
+          console.log('🔔 Push notification message received from service worker:', event.data.notification);
+          
+          // Import and save notification to Firestore
+          import('./services/enhancedNotificationService').then(({ handleIncomingPushNotification }) => {
+            const currentUser = window.currentUser || null;
+            if (currentUser && currentUser.uid) {
+              handleIncomingPushNotification(event.data.notification, currentUser.uid);
+              console.log('✅ Push notification from service worker saved to Firestore');
+            } else {
+              console.warn('⚠️ No user ID available for service worker notification capture');
+            }
+          }).catch(error => {
+            console.error('❌ Failed to import enhanced service for service worker notification:', error);
+          });
+        }
+        
+        // CRITICAL FIX: Handle offline notification sync
+        if (event.data && event.data.type === 'OFFLINE_NOTIFICATION_SYNC') {
+          console.log('🔄 Offline notification sync received:', event.data.notification);
+          
+          // Import and save offline notification to Firestore
+          import('./services/enhancedNotificationService').then(({ handleIncomingPushNotification }) => {
+            const currentUser = window.currentUser || null;
+            if (currentUser && currentUser.uid) {
+              handleIncomingPushNotification(event.data.notification, currentUser.uid);
+              console.log('✅ Offline notification synced and saved to Firestore');
+            } else {
+              console.warn('⚠️ No user ID available for offline notification sync');
+            }
+          }).catch(error => {
+            console.error('❌ Failed to import enhanced service for offline notification sync:', error);
+          });
+        }
+      });
+      
+      // CRITICAL FIX: Trigger background sync when app comes back online
+      window.addEventListener('online', function() {
+        console.log('🌐 App came back online, triggering background sync');
+        if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+          navigator.serviceWorker.controller.postMessage({
+            type: 'TRIGGER_BACKGROUND_SYNC'
+          });
+        }
+      });
+      
+      // CRITICAL FIX: Mobile network status monitoring
+      window.addEventListener('offline', function() {
+        console.log('📱 App went offline, notifications will be cached');
+      });
+      
+      // CRITICAL FIX: Mobile connection quality monitoring
+      if ('connection' in navigator) {
+        navigator.connection.addEventListener('change', function() {
+          console.log('📶 Connection changed:', {
+            effectiveType: navigator.connection.effectiveType,
+            downlink: navigator.connection.downlink,
+            rtt: navigator.connection.rtt
+          });
+        });
+      }
+      
+      // CRITICAL FIX: Mobile battery status monitoring
+      if ('getBattery' in navigator) {
+        navigator.getBattery().then(function(battery) {
+          battery.addEventListener('levelchange', function() {
+            console.log('🔋 Battery level:', battery.level);
+            if (battery.level < 0.2) {
+              console.log('⚠️ Low battery - optimizing notification delivery');
+            }
+          });
+        });
+      }
+    }
   } catch (error) {
     console.error('❌ React app rendering failed:', error);
     

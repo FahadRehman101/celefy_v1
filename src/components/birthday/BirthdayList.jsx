@@ -119,7 +119,7 @@ const BirthdayList = ({ birthdays = [], onRefresh, loading = false, userId, onDa
 
   return (
     <>
-      <div className="space-y-4">
+      <div className="space-y-4 px-2 md:px-4">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-bold text-gray-800">
             Celebrations 🎉
@@ -139,7 +139,7 @@ const BirthdayList = ({ birthdays = [], onRefresh, loading = false, userId, onDa
           </div>
         </div>
 
-        <div className="grid gap-4">
+        <div className="grid gap-1.5 md:gap-2 w-full">
           {birthdays.map((birthday) => (
             <BirthdayCard 
               key={birthday.id} 
@@ -269,102 +269,104 @@ const BirthdayCard = ({ birthday, onEdit, onDelete, isOptimistic = false }) => {
   };
 
   return (
-    <Card className={`p-6 ${getCardStyle()}`}>
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4">
-          {/* Avatar */}
-          <div className="w-12 h-12 bg-gradient-to-r from-pink-400 to-purple-500 rounded-full flex items-center justify-center text-white text-xl relative">
-            {birthday.avatar || '🎂'}
-            
-            {/* Optimistic indicator */}
-            {isOptimistic && (
-              <div className="absolute -top-1 -right-1 w-3 h-3 bg-blue-500 rounded-full animate-pulse" title="Syncing..."></div>
-            )}
-          </div>
-          
-          {/* Birthday Info */}
-          <div className="flex-1">
-            <div className="flex items-center space-x-2">
-              <h3 className="text-lg font-semibold text-gray-800">
-                {birthday.name || 'Unknown'}
-              </h3>
+    <Card className={`p-2 md:p-3 w-full max-w-full ${getCardStyle()}`}>
+      <div className="flex flex-col space-y-2 w-full">
+        {/* Top Row - Name, Badges, and Days Until */}
+        <div className="flex items-center justify-between w-full">
+          <div className="flex items-center space-x-2 flex-1 min-w-0">
+            {/* Avatar - Smaller */}
+            <div className="w-8 h-8 bg-gradient-to-r from-pink-400 to-purple-500 rounded-full flex items-center justify-center text-white text-sm relative flex-shrink-0">
+              {birthday.avatar || '🎂'}
               
-              {/* Status badges */}
-              {isToday && (
-                <span className="bg-yellow-400 text-yellow-900 text-xs px-2 py-1 rounded-full font-medium">
-                  Birthday Today!
-                </span>
-              )}
-              {isUpcoming && (
-                <span className="bg-purple-100 text-purple-700 text-xs px-2 py-1 rounded-full">
-                  Soon
-                </span>
-              )}
+              {/* Optimistic indicator */}
               {isOptimistic && (
-                <span className="bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded-full">
-                  Syncing...
-                </span>
+                <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-blue-500 rounded-full animate-pulse" title="Syncing..."></div>
               )}
             </div>
             
-            <div className="flex items-center space-x-4 mt-1 text-sm text-gray-600">
-              <div className="flex items-center space-x-1">
-                <Heart className="w-4 h-4" />
-                <span>{birthday.relation || 'Friend'}</span>
+            {/* Name & Badges - Compact */}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center space-x-2">
+                <h3 className="text-sm font-semibold text-gray-800 truncate flex-1">
+                  {birthday.name || 'Unknown'}
+                </h3>
+                
+                {/* Status badges - Very Compact */}
+                {isToday && (
+                  <span className="bg-yellow-400 text-yellow-900 text-xs px-1.5 py-0.5 rounded-full font-medium flex-shrink-0">
+                    Today!
+                  </span>
+                )}
+                {isUpcoming && (
+                  <span className="bg-purple-100 text-purple-700 text-xs px-1.5 py-0.5 rounded-full font-medium flex-shrink-0">
+                    Soon
+                  </span>
+                )}
+                {isOptimistic && (
+                  <span className="bg-blue-100 text-blue-700 text-xs px-1.5 py-0.5 rounded-full font-medium flex-shrink-0">
+                    Syncing...
+                  </span>
+                )}
               </div>
-              
-              <div className="flex items-center space-x-1">
-                <Calendar className="w-4 h-4" />
-                <span>{formatDisplayDate(birthday.date)}</span>
-              </div>
-              
-              {age > 0 && age < 150 && (
-                <div className="text-gray-500">
-                  {isToday ? `Turning ${age + 1}` : `Age ${age}`}
-                </div>
-              )}
             </div>
           </div>
-        </div>
 
-        {/* Days Until */}
-        <div className="text-right">
-          <div className={`text-lg font-semibold ${
+          {/* Days Until - Compact */}
+          <div className={`text-sm font-semibold ml-2 flex-shrink-0 ${
             isToday ? 'text-yellow-600' : 
             isUpcoming ? 'text-purple-600' : 
             'text-gray-600'
           }`}>
             {getDaysText()}
           </div>
-          
-          {/* Action Buttons */}
-          <div className="flex items-center space-x-2 mt-2">
-            <button 
-              onClick={onEdit}
-              className="p-2 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
-              title="Edit birthday"
-            >
-              <Edit3 className="w-4 h-4" />
-            </button>
-            <button 
-              onClick={onDelete}
-              className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-              title="Delete birthday"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
-          </div>
         </div>
-      </div>
 
-      {/* Birthday Message for Today */}
-      {isToday && (
-        <div className="mt-4 p-3 bg-yellow-100 rounded-lg">
-          <p className="text-yellow-800 text-sm font-medium">
-            🎉 Don't forget to wish {birthday.name} a happy birthday today!
-          </p>
+        {/* Middle Row - Info (Relation, Date, Age) */}
+        <div className="flex flex-wrap items-center gap-1.5 text-xs text-gray-600">
+          <div className="flex items-center space-x-1">
+            <Heart className="w-3 h-3 flex-shrink-0" />
+            <span className="truncate">{birthday.relation || 'Friend'}</span>
+          </div>
+          
+          <div className="flex items-center space-x-1">
+            <Calendar className="w-3 h-3 flex-shrink-0" />
+            <span className="truncate">{formatDisplayDate(birthday.date)}</span>
+          </div>
+          
+          {age > 0 && age < 150 && (
+            <div className="text-gray-500 truncate">
+              {isToday ? `Turning ${age + 1}` : `Age ${age}`}
+            </div>
+          )}
         </div>
-      )}
+
+        {/* Bottom Row - Action Buttons */}
+        <div className="flex items-center justify-end space-x-1 pt-1">
+          <button 
+            onClick={onEdit}
+            className="p-1 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors flex-shrink-0"
+            title="Edit birthday"
+          >
+            <Edit3 className="w-3.5 h-3.5" />
+          </button>
+          <button 
+            onClick={onDelete}
+            className="p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors flex-shrink-0"
+            title="Delete birthday"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        </div>
+
+        {/* Birthday Message for Today - Compact */}
+        {isToday && (
+          <div className="mt-2 p-2 bg-yellow-100 rounded-lg">
+            <p className="text-yellow-800 text-xs font-medium">
+              🎉 Don't forget to wish {birthday.name} a happy birthday today!
+            </p>
+          </div>
+        )}
+      </div>
     </Card>
   );
 };

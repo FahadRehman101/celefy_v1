@@ -8,7 +8,8 @@ const Modal = ({
   children, 
   showCloseButton = true,
   className = '',
-  overlayClassName = '' 
+  overlayClassName = '',
+  fullScreen = false // 🎯 NEW: Full screen option
 }) => {
   // Handle escape key
   useEffect(() => {
@@ -42,25 +43,35 @@ const Modal = ({
 
   return (
     <div 
-      className={`fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 ${overlayClassName}`}
+      className={`fixed inset-0 bg-gradient-to-br from-black/80 via-purple-900/70 to-pink-900/70 backdrop-blur-sm flex items-center justify-center z-50 ${overlayClassName}`}
       onClick={handleBackdropClick}
     >
       <div 
-        className={`bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto relative ${className}`}
+        className={`${
+          fullScreen 
+            ? 'w-full h-full max-w-none max-h-none rounded-none' // 🎯 FULL SCREEN
+            : 'max-w-md w-full max-h-[90vh] rounded-2xl' // 🎯 REGULAR MODAL
+        } bg-gradient-to-br from-white via-pink-50 to-purple-50 dark:from-gray-900 dark:via-pink-900/20 dark:to-purple-900/20 shadow-2xl overflow-y-auto relative border border-pink-200/50 dark:border-pink-700/50 ${className}`}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Close button */}
+        {/* 🎯 ENHANCED CLOSE BUTTON - Full screen optimized */}
         {showCloseButton && (
           <button
             onClick={onClose}
-            className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors z-10"
+            className={`absolute top-4 right-4 p-2 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-full shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-110 z-10 ${
+              fullScreen ? 'top-6 right-6 p-3' : 'top-4 right-4 p-2'
+            }`}
           >
-            <X className="w-5 h-5" />
+            <X className={`text-gray-600 dark:text-gray-300 hover:text-pink-600 dark:hover:text-pink-400 transition-colors ${
+              fullScreen ? 'w-6 h-6' : 'w-5 h-5'
+            }`} />
           </button>
         )}
 
-        {/* Modal content */}
-        <div className="p-6">
+        {/* 🎯 MODAL CONTENT - Full screen optimized */}
+        <div className={`${
+          fullScreen ? 'p-6 md:p-8 lg:p-12' : 'p-6'
+        }`}>
           {children}
         </div>
       </div>

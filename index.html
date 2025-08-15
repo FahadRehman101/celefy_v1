@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 
@@ -18,13 +18,47 @@
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=stylesheet" />
 
     <!-- OneSignal v16 SDK - Load only, no initialization -->
     <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+    
+    <!-- CRITICAL: Mobile Scroll Locking Styles -->
+    <style>
+      /* Prevent body scrolling on mobile */
+      html, body {
+        overflow: hidden !important;
+        position: fixed !important;
+        width: 100% !important;
+        height: 100% !important;
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior: none;
+        touch-action: none;
+      }
+      
+      /* Ensure root container is properly constrained */
+      #root {
+        width: 100vw !important;
+        height: 100vh !important;
+        overflow: hidden !important;
+        position: relative !important;
+      }
+      
+      /* Mobile-specific viewport handling */
+      @media (max-width: 768px) {
+        html, body {
+          position: fixed !important;
+          overflow: hidden !important;
+          width: 100vw !important;
+          height: 100vh !important;
+          max-width: 100vw !important;
+          max-height: 100vh !important;
+        }
+      }
+    </style>
   </head>
   
-  <body class="bg-light dark:bg-dark">
+  <body>
     <div id="root"></div>
     
     <!-- OneSignal SDK loaded, initialization handled by main.jsx -->

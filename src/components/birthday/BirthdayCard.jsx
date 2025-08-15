@@ -71,50 +71,50 @@ const BirthdayCard = ({
     <Card
       variant={isToday ? 'gradient' : 'default'}
       hover
-      className={`relative overflow-hidden ${className}`}
+      className={`relative overflow-hidden w-full max-w-full ${className}`}
     >
       {/* Today indicator */}
       {isToday && (
-        <div className="absolute top-0 right-0 w-0 h-0 border-t-[40px] border-r-[40px] border-t-primary-500 border-r-transparent">
-          <Gift className="absolute -top-8 -right-6 w-4 h-4 text-white" />
+        <div className="absolute top-0 right-0 w-0 h-0 border-t-[30px] border-r-[30px] border-t-primary-500 border-r-transparent">
+          <Gift className="absolute -top-6 -right-5 w-3 h-3 text-white" />
         </div>
       )}
       
-      <Card.Content>
+      <Card.Content className="p-3 md:p-4">
         {/* Header with name and age */}
-        <div className="flex items-start justify-between mb-3">
-          <div className="flex-1 min-w-0">
-            <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 truncate">
+        <div className="flex items-start justify-between mb-2">
+          <div className="flex-1 min-w-0 pr-2">
+            <h3 className="text-base font-semibold text-neutral-900 dark:text-neutral-100 truncate">
               {birthday.name}
             </h3>
             {age > 0 && (
-              <p className="text-sm text-neutral-500 dark:text-neutral-400">
+              <p className="text-xs text-neutral-500 dark:text-neutral-400">
                 {isToday ? `Turning ${age + 1}` : `Age ${age}`}
               </p>
             )}
           </div>
           
           {/* Time until badge */}
-          <Badge variant={getBadgeVariant()} size="sm">
+          <Badge variant={getBadgeVariant()} size="sm" className="flex-shrink-0 text-xs">
             {timeUntil}
           </Badge>
         </div>
         
         {/* Relationship and date info */}
-        <div className="space-y-2 mb-4">
-          <div className="flex items-center text-sm text-neutral-600 dark:text-neutral-400">
+        <div className="space-y-1 mb-3">
+          <div className="flex items-center text-xs text-neutral-600 dark:text-neutral-400">
             {getRelationshipIcon()}
             <span className="ml-2">{birthday.relation}</span>
           </div>
           
-          <div className="flex items-center text-sm text-neutral-600 dark:text-neutral-400">
-            <Calendar className="w-4 h-4" />
+          <div className="flex items-center text-xs text-neutral-600 dark:text-neutral-400">
+            <Calendar className="w-3 h-3" />
             <span className="ml-2">{formatDate(birthday.date, 'long')}</span>
           </div>
           
           {!isToday && (
-            <div className="flex items-center text-sm text-neutral-600 dark:text-neutral-400">
-              <Clock className="w-4 h-4" />
+            <div className="flex items-center text-xs text-neutral-600 dark:text-neutral-400">
+              <Clock className="w-3 h-3" />
               <span className="ml-2">
                 {daysUntil === 0 ? 'Today!' : 
                  daysUntil === 1 ? 'Tomorrow' : 
@@ -125,14 +125,14 @@ const BirthdayCard = ({
         </div>
         
         {/* Actions */}
-        <div className="flex items-center justify-between pt-3 border-t border-neutral-200 dark:border-neutral-700">
-          <div className="flex space-x-2">
+        <div className="flex items-center justify-between pt-2 border-t border-neutral-200 dark:border-neutral-700">
+          <div className="flex space-x-1">
             <Button
               variant="ghost"
               size="sm"
               onClick={() => onEdit(birthday)}
-              icon={<Edit3 className="w-4 h-4" />}
-              className="text-neutral-600 hover:text-primary-600 dark:text-neutral-400 dark:hover:text-primary-400"
+              icon={<Edit3 className="w-3 h-3" />}
+              className="text-neutral-600 hover:text-primary-600 dark:text-neutral-400 dark:hover:text-primary-400 px-1 py-1 text-xs"
             >
               Edit
             </Button>
@@ -143,8 +143,8 @@ const BirthdayCard = ({
             size="sm"
             onClick={handleDelete}
             loading={isDeleting}
-            icon={<Trash2 className="w-4 h-4" />}
-            className="text-neutral-600 hover:text-red-600 dark:text-neutral-400 dark:hover:text-red-400"
+            icon={<Trash2 className="w-3 h-3" />}
+            className="text-neutral-600 hover:text-red-600 dark:text-neutral-400 dark:hover:text-red-400 px-1 py-1 text-xs"
           >
             Delete
           </Button>
