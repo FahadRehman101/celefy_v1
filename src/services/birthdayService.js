@@ -551,3 +551,4 @@ class BirthdayService {
 // Export singleton instance
 const birthdayService = new BirthdayService();
 export default birthdayService;
+

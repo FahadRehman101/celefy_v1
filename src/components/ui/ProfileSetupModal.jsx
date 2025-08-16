@@ -294,3 +294,4 @@ const ProfileSetupModal = ({ isOpen, onClose, onComplete, user }) => {
 
 export default ProfileSetupModal;
 
+

@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "682198067789",
+    "project_id": "celefyy",
+    "storage_bucket": "celefyy.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:682198067789:android:626f530011b883c356ca04",
+        "android_client_info": {
+          "package_name": "com.celefy.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "682198067789-a350ovs3b10hnc0ij5m09s3if65ebvou.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB9QLG16UJ0knwyxvDt3mYay3ofj2WcCfg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "682198067789-a350ovs3b10hnc0ij5m09s3if65ebvou.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

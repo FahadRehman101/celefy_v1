@@ -270,3 +270,4 @@ class UserProfileService {
 // Export singleton instance
 const userProfileService = new UserProfileService();
 export default userProfileService;
+

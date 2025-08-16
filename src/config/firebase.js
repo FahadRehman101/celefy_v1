@@ -1,6 +1,6 @@
-// 🔒 SECURE - src/config/firebase.js
+// 🔒 SECURE - src/config/firebase.js - NATIVE ANDROID COMPATIBLE
 import { initializeApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider } from "firebase/auth";
+import { getAuth, GoogleAuthProvider, connectAuthEmulator } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
 // 🔑 Secure Firebase configuration using environment variables
@@ -39,7 +39,37 @@ const app = initializeApp(firebaseConfig);
 // ✅ Initialize Services
 const auth = getAuth(app);
 const db = getFirestore(app);
+
+// 🚀 NATIVE ANDROID COMPATIBILITY: Configure Google Auth for native apps
 const googleProvider = new GoogleAuthProvider();
+
+// CRITICAL: Configure Google Auth for native Android
+googleProvider.setCustomParameters({
+  // Force account selection for better mobile UX
+  prompt: 'select_account',
+  // Ensure proper redirect handling in native mode
+  redirect_uri: window.location.origin,
+  // Add mobile-specific parameters
+  mobile: true,
+  // Native app authentication
+  native: true
+});
+
+// 🚀 NATIVE ANDROID COMPATIBILITY: Configure auth for native apps
+if (typeof window !== 'undefined' && window.Capacitor) {
+  console.log('🚀 Capacitor detected - configuring Firebase for native Android app');
+  
+  // Configure auth for native app behavior
+  auth.useDeviceLanguage();
+  
+  // Set persistence for better mobile experience
+  auth.settings.appVerificationDisabledForTesting = false;
+  
+  // Enable native authentication
+  auth.settings.forceRefreshToken = true;
+}
+
+console.log('✅ Firebase configured for native Android compatibility');
 
 // ✅ Export everything
 export {

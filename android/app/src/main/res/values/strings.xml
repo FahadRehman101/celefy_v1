@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Celefy</string>
+    <string name="title_activity_main">Celefy</string>
+    <string name="package_name">com.celefy.app</string>
+    <string name="custom_url_scheme">com.celefy.app</string>
+</resources>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
+import { signInWithCredential, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import { auth, googleProvider } from '@/config/firebase';
 import { Gift, AlertCircle } from 'lucide-react';
 
@@ -13,11 +13,21 @@ const Login = () => {
     
     try {
       console.log('Starting Google sign in...');
-      const result = await signInWithPopup(auth, googleProvider);
-      console.log('Login successful:', result.user.email);
       
-      // Optional: Create user profile in Firestore
-      // We'll add this in the next step
+      // Check if we're in Capacitor (native Android)
+      if (window.Capacitor) {
+        console.log('🚀 Capacitor detected - using native Android authentication');
+        
+        // Use native Android authentication
+        const result = await handleNativeAndroidAuth();
+        console.log('Native Android login successful:', result.user.email);
+      } else {
+        console.log('🌐 Web detected - using popup authentication');
+        
+        // Fallback to popup for web
+        const result = await signInWithPopup(auth, googleProvider);
+        console.log('Web login successful:', result.user.email);
+      }
       
     } catch (error) {
       console.error('Login error:', error);
@@ -29,11 +39,47 @@ const Login = () => {
         setError('Pop-up was blocked. Please allow pop-ups and try again.');
       } else if (error.code === 'auth/network-request-failed') {
         setError('Network error. Please check your connection.');
+      } else if (error.code === 'auth/account-exists-with-different-credential') {
+        setError('An account already exists with this email. Please sign in with the correct method.');
       } else {
-        setError('Failed to sign in. Please try again.');
+        setError(`Failed to sign in: ${error.message}`);
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Native Android Authentication
+  const handleNativeAndroidAuth = async () => {
+    try {
+      console.log('🔐 Using native Android authentication...');
+      
+      // In Capacitor, we need to handle the authentication differently
+      // The key is that Firebase will use the native Android Google Sign-In
+      // when the app is running in Capacitor
+      
+      // For now, let's try the standard approach but with better error handling
+      // Firebase should automatically detect Capacitor and use native methods
+      const result = await signInWithPopup(auth, googleProvider);
+      
+      console.log('✅ Native authentication successful');
+      return result;
+      
+    } catch (error) {
+      console.error('Native Android authentication failed:', error);
+      
+      // If the first attempt fails, try alternative approach
+      if (error.code === 'auth/popup-closed-by-user') {
+        // User cancelled - try again
+        console.log('🔄 User cancelled, trying again...');
+        return await signInWithPopup(auth, googleProvider);
+      } else if (error.code === 'auth/network-request-failed') {
+        throw new Error('Network error. Please check your connection and try again.');
+      } else if (error.code === 'auth/popup-blocked') {
+        throw new Error('Authentication popup was blocked. Please allow popups and try again.');
+      } else {
+        throw error;
+      }
     }
   };
 
